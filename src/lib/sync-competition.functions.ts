@@ -27,7 +27,7 @@ export const syncCompetition = createServerFn({ method: "POST" })
     const finish = async (
       status: string,
       metric: number,
-      detail: Record<string, unknown>,
+      detail: Record<string, any>,
       error?: string,
     ) => {
       await supabaseAdmin.from("job_runs").insert({
@@ -36,7 +36,7 @@ export const syncCompetition = createServerFn({ method: "POST" })
         finished_at: new Date().toISOString(),
         status,
         result_metric: metric,
-        result_detail: detail,
+        result_detail: detail as any,
         error: error ?? null,
       });
     };
@@ -174,8 +174,8 @@ export const syncCompetition = createServerFn({ method: "POST" })
 
     const teamIdCache = new Map<string, string>();
     const upsertTeam = async (team: Record<string, any> | undefined) => {
-      if (!team?.id) return null;
-      const key = String(team.id);
+      if (!team?.['id']) return null;
+      const key = String(team['id']);
       if (teamIdCache.has(key)) return teamIdCache.get(key)!;
       const { data: row, error } = await supabaseAdmin
         .from("teams")
@@ -183,10 +183,10 @@ export const syncCompetition = createServerFn({ method: "POST" })
           {
             external_id: key,
             source: "sofascore",
-            name_en: team.name ?? team.shortName ?? null,
-            name_he: team.name ?? team.shortName ?? null,
-            short_name: team.nameCode ?? team.shortName ?? null,
-            country: team.country?.name ?? null,
+            name_en: team['name'] ?? team['shortName'] ?? null,
+            name_he: team['name'] ?? team['shortName'] ?? null,
+            short_name: team['nameCode'] ?? team['shortName'] ?? null,
+            country: team['country']?.['name'] ?? null,
             fetched_at: new Date().toISOString(),
           },
           { onConflict: "external_id,source" },
