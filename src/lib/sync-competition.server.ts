@@ -94,7 +94,7 @@ export async function runSyncCompetition(data: { tournamentId: number }): Promis
     const seasonsRes = await call(`/tournaments/get-seasons?tournamentId=${tournamentId}`);
     if (!seasonsRes.ok || !seasonsRes.json) {
       await finish(
-        "error",
+        "failed",
         0,
         { stage: "seasons", http_status: seasonsRes.status },
         seasonsRes.body.slice(0, 500),
@@ -145,7 +145,7 @@ export async function runSyncCompetition(data: { tournamentId: number }): Promis
     );
     if (!matchesRes.ok || !matchesRes.json) {
       await finish(
-        "error",
+        "failed",
         0,
         { stage: "matches", http_status: matchesRes.status, season_chosen: seasonId },
         matchesRes.body.slice(0, 500),
