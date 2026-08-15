@@ -35,7 +35,7 @@ export async function runSyncCompetition(data: { tournamentId: number }): Promis
     };
 
     if (!apiKey) {
-      await finish("error", 0, {}, "SOFASCORE_API_KEY missing");
+      await finish("failed", 0, {}, "SOFASCORE_API_KEY missing");
       return {
         status: "error",
         teams_upserted: 0,
@@ -76,7 +76,7 @@ export async function runSyncCompetition(data: { tournamentId: number }): Promis
       .maybeSingle();
 
     if (!comp) {
-      await finish("error", 0, {}, "competition row not found");
+      await finish("failed", 0, {}, "competition row not found");
       return {
         status: "error",
         teams_upserted: 0,
@@ -111,7 +111,7 @@ export async function runSyncCompetition(data: { tournamentId: number }): Promis
     const seasons: Array<{ id: number; year?: string; name?: string }> =
       seasonsRes.json["seasons"] ?? seasonsRes.json["data"]?.["seasons"] ?? [];
     if (seasons.length === 0) {
-      await finish("error", 0, { stage: "seasons" }, "no seasons returned");
+      await finish("failed", 0, { stage: "seasons" }, "no seasons returned");
       return {
         status: "error",
         teams_upserted: 0,
