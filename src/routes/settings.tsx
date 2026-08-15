@@ -63,7 +63,7 @@ function SettingsScreen() {
               >
                 <span className="text-sm">{t.label}</span>
                 <Switch
-                  checked={master && subs[t.id]}
+                  checked={master && subs[t.id] === true}
                   disabled={!master}
                   aria-label={t.label}
                   onCheckedChange={(v) => setSubs((s) => ({ ...s, [t.id]: v }))}
