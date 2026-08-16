@@ -91,7 +91,7 @@ export async function runSyncCompetition(data: { tournamentId: number }): Promis
       await finish("skipped", 0, { reason: "budget_exhausted", stage: "seasons" });
       return { status: "skipped", teams_upserted: 0, matches_upserted: 0, season_chosen: null };
     }
-    const seasonsRes = await call(`/tournaments/get-seasons?tournamentId=${tournamentId}`);
+    const seasonsRes = await call(`/api/v1/tournament/${tournamentId}/seasons`);
     if (!seasonsRes.ok || !seasonsRes.json) {
       await finish(
         "failed",
