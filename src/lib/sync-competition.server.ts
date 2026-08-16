@@ -91,7 +91,7 @@ export async function runSyncCompetition(data: { tournamentId: number }): Promis
       await finish("skipped", 0, { reason: "budget_exhausted", stage: "seasons" });
       return { status: "skipped", teams_upserted: 0, matches_upserted: 0, season_chosen: null };
     }
-    const seasonsRes = await call(`/tournaments/get-seasons?tournamentId=${tournamentId}`);
+    const seasonsRes = await call(`/api/v1/tournament/${tournamentId}/seasons`);
     if (!seasonsRes.ok || !seasonsRes.json) {
       await finish(
         "failed",
@@ -135,35 +135,12 @@ export async function runSyncCompetition(data: { tournamentId: number }): Promis
       .update({ current_season_id: seasonId, fetched_at: new Date().toISOString() })
       .eq("id", comp.id);
 
-    // ---- next matches (page 0 only)
-    if (!(await takeBudget("bulk"))) {
-      await finish("skipped", 0, { reason: "budget_exhausted", stage: "matches", season_chosen: seasonId });
-      return { status: "skipped", teams_upserted: 0, matches_upserted: 0, season_chosen: seasonId };
-    }
-    const matchesRes = await call(
-      `/tournaments/get-next-matches?tournamentId=${tournamentId}&seasonId=${seasonId}&page=0`,
-    );
-    if (!matchesRes.ok || !matchesRes.json) {
-      await finish(
-        "failed",
-        0,
-        { stage: "matches", http_status: matchesRes.status, season_chosen: seasonId },
-        matchesRes.body.slice(0, 500),
-      );
-      return {
-        status: "error",
-        teams_upserted: 0,
-        matches_upserted: 0,
-        season_chosen: seasonId,
-        message: `matches request failed (${matchesRes.status})`,
-      };
-    }
-
-    const events: Array<Record<string, any>> =
-      matchesRes.json["events"] ?? matchesRes.json["data"]?.["events"] ?? [];
-
+    // ---- upcoming matches via category scheduled-events (day by day)
     let teamsUpserted = 0;
     let matchesUpserted = 0;
+    let matchesFound = 0;
+    let daysChecked = 0;
+    let categoryId: number | null = null;
 
     const teamIdCache = new Map<string, string>();
     const upsertTeam = async (team: Record<string, any> | undefined) => {
@@ -192,36 +169,128 @@ export async function runSyncCompetition(data: { tournamentId: number }): Promis
       return row.id;
     };
 
-    for (const ev of events) {
-      const homeId = await upsertTeam(ev["homeTeam"]);
-      const awayId = await upsertTeam(ev["awayTeam"]);
-      if (!homeId || !awayId) continue;
+    const dayStr = (d: Date) => d.toISOString().slice(0, 10);
+    const today = new Date();
 
-      const kickoff = ev["startTimestamp"]
-        ? new Date(Number(ev["startTimestamp"]) * 1000).toISOString()
-        : null;
+    const stopPartial = async (reason: string, extra: Record<string, any> = {}) => {
+      await finish("partial", matchesUpserted, {
+        reason,
+        category_id: categoryId,
+        days_checked: daysChecked,
+        matches_found_for_266: matchesFound,
+        teams_upserted: teamsUpserted,
+        matches_upserted: matchesUpserted,
+        season_chosen: seasonId,
+        ...extra,
+      });
+      return {
+        status: "partial" as const,
+        teams_upserted: teamsUpserted,
+        matches_upserted: matchesUpserted,
+        season_chosen: seasonId,
+        message: reason,
+      };
+    };
 
-      const { error } = await supabaseAdmin.from("matches").upsert(
-        {
-          external_id: String(ev["id"]),
-          source: "sofascore",
-          competition_id: comp.id,
-          home_team_id: homeId,
-          away_team_id: awayId,
-          kickoff_at: kickoff,
-          time_confirmed: ev["startTimestamp"] != null && ev["timeConfirmed"] === true,
-          status: ev["status"]?.type ?? null,
-          venue: ev["venue"]?.stadium?.name ?? null,
-          round: ev["roundInfo"]?.round != null ? String(ev["roundInfo"].round) : null,
-          fetched_at: new Date().toISOString(),
-        },
-        { onConflict: "external_id,source" },
+    // 1. discover Israel category
+    if (!(await takeBudget("bulk"))) {
+      return stopPartial("budget_exhausted_at_categories");
+    }
+    const catsRes = await call(`/api/v1/sport/football/${dayStr(today)}/0/categories`);
+    if (!catsRes.ok || !catsRes.json) {
+      await finish(
+        "failed",
+        0,
+        { stage: "categories", http_status: catsRes.status, season_chosen: seasonId },
+        catsRes.body.slice(0, 500),
       );
-      if (!error) matchesUpserted += 1;
+      return {
+        status: "error",
+        teams_upserted: 0,
+        matches_upserted: 0,
+        season_chosen: seasonId,
+        message: `categories request failed (${catsRes.status}): ${catsRes.body.slice(0, 200)}`,
+      };
     }
 
-    const status = matchesUpserted > 0 ? "success" : events.length > 0 ? "partial" : "skipped";
+    const categories: Array<Record<string, any>> =
+      catsRes.json["categories"] ?? catsRes.json["data"]?.["categories"] ?? [];
+    const israel = categories.find((c) => {
+      const name = String(c["name"] ?? "").toLowerCase();
+      const slug = String(c["slug"] ?? "").toLowerCase();
+      const flag = String(c["flag"] ?? "").toLowerCase();
+      const alpha = String(c["alpha2"] ?? "").toLowerCase();
+      return name === "israel" || slug === "israel" || flag === "israel" || alpha === "il";
+    });
+
+    if (!israel) {
+      await finish(
+        "failed",
+        0,
+        { stage: "categories", season_chosen: seasonId, categories_count: categories.length },
+        "israel category not found",
+      );
+      return {
+        status: "error",
+        teams_upserted: 0,
+        matches_upserted: 0,
+        season_chosen: seasonId,
+        message: "israel category not found",
+      };
+    }
+    categoryId = Number(israel["id"]);
+
+    // 2. day by day scheduled events
+    for (let i = 0; i <= 21; i++) {
+      if (!(await takeBudget("bulk"))) {
+        return stopPartial("budget_exhausted_at_day_" + i);
+      }
+      const d = new Date(today.getTime() + i * 86400000);
+      const res = await call(`/api/v1/category/${categoryId}/scheduled-events/${dayStr(d)}`);
+      daysChecked += 1;
+      if (!res.ok || !res.json) continue;
+
+      const events: Array<Record<string, any>> =
+        res.json["events"] ?? res.json["data"]?.["events"] ?? [];
+
+      for (const ev of events) {
+        const uniqueId = ev["tournament"]?.["uniqueTournament"]?.["id"];
+        if (Number(uniqueId) !== tournamentId) continue;
+        matchesFound += 1;
+
+        const homeId = await upsertTeam(ev["homeTeam"]);
+        const awayId = await upsertTeam(ev["awayTeam"]);
+        if (!homeId || !awayId) continue;
+
+        const kickoff = ev["startTimestamp"]
+          ? new Date(Number(ev["startTimestamp"]) * 1000).toISOString()
+          : null;
+
+        const { error } = await supabaseAdmin.from("matches").upsert(
+          {
+            external_id: String(ev["id"]),
+            source: "sofascore",
+            competition_id: comp.id,
+            home_team_id: homeId,
+            away_team_id: awayId,
+            kickoff_at: kickoff,
+            time_confirmed: ev["startTimestamp"] != null && ev["timeConfirmed"] === true,
+            status: ev["status"]?.["type"] ?? null,
+            venue: ev["venue"]?.["stadium"]?.["name"] ?? null,
+            round: ev["roundInfo"]?.["round"] != null ? String(ev["roundInfo"]["round"]) : null,
+            fetched_at: new Date().toISOString(),
+          },
+          { onConflict: "external_id,source" },
+        );
+        if (!error) matchesUpserted += 1;
+      }
+    }
+
+    const status = matchesUpserted > 0 ? "success" : "skipped";
     await finish(status, matchesUpserted, {
+      category_id: categoryId,
+      days_checked: daysChecked,
+      matches_found_for_266: matchesFound,
       teams_upserted: teamsUpserted,
       matches_upserted: matchesUpserted,
       season_chosen: seasonId,
