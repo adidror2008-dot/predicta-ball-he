@@ -9,73 +9,67 @@ export type TeamHistoryTeamResult = {
   error: string | null;
 };
 
+export type JobRunStatus = "success" | "partial" | "failed" | "skipped";
+
 export type FetchTeamHistoryResult = {
-  status: "succeeded" | "failed";
+  status: JobRunStatus;
   teams_checked: number;
   teams_updated: number;
   rows_upserted: number;
   budget_exhausted: boolean;
   teams: TeamHistoryTeamResult[];
   message?: string;
+  job_run_error?: string;
 };
 
 export async function runFetchTeamHistory(
   data: { teamExternalId?: string; limit?: number } = {},
 ): Promise<FetchTeamHistoryResult> {
   const limit = data.limit ?? 10;
-  const started = new Date().toISOString();
+  const startedAt = new Date().toISOString();
   const apiKey = process.env["SPORTAPI_API_KEY"];
 
-  const { data: jobRow } = await supabaseAdmin
-    .from("job_runs")
-    .insert({
-      job_name: "fetch-team-history",
-      started_at: started,
-      status: "running",
-    })
-    .select("id")
-    .maybeSingle();
-
-  const finish = async (
-    status: "succeeded" | "failed",
+  // Writes exactly ONE job_runs row at the end of the run.
+  const report = async (
+    status: JobRunStatus,
     metric: number,
     detail: Record<string, unknown>,
     error?: string,
-  ) => {
-    const payload = {
+  ): Promise<string | undefined> => {
+    const { error: jobError } = await supabaseAdmin.from("job_runs").insert({
+      job_name: "fetch-team-history",
+      started_at: startedAt,
       finished_at: new Date().toISOString(),
       status,
       result_metric: metric,
       result_detail: detail as never,
       error: error ?? null,
-    };
-    if (jobRow?.id) {
-      await supabaseAdmin.from("job_runs").update(payload).eq("id", jobRow.id);
-    } else {
-      await supabaseAdmin.from("job_runs").insert({
-        job_name: "fetch-team-history",
-        started_at: started,
-        ...payload,
-      });
+    });
+    if (jobError) {
+      console.error(
+        `[fetch-team-history] job_runs insert failed: ${jobError.message}`,
+        jobError,
+      );
+      return jobError.message;
     }
+    return undefined;
+  };
+
+  const emptyDetail = {
+    teams_checked: 0,
+    teams_updated: 0,
+    rows_upserted: 0,
+    budget_exhausted: false,
+    teams: [] as TeamHistoryTeamResult[],
   };
 
   if (!apiKey || apiKey.trim() === "") {
-    await finish("failed", 0, {
-      teams_checked: 0,
-      teams_updated: 0,
-      rows_upserted: 0,
-      budget_exhausted: false,
-      teams: [],
-    }, "missing SPORTAPI_API_KEY");
+    const jobRunError = await report("failed", 0, emptyDetail, "missing SPORTAPI_API_KEY");
     return {
       status: "failed",
-      teams_checked: 0,
-      teams_updated: 0,
-      rows_upserted: 0,
-      budget_exhausted: false,
-      teams: [],
+      ...emptyDetail,
       message: "missing SPORTAPI_API_KEY",
+      ...(jobRunError ? { job_run_error: jobRunError } : {}),
     };
   }
 
@@ -96,23 +90,15 @@ export async function runFetchTeamHistory(
   const { data: teams, error: teamsError } = await query;
 
   if (teamsError) {
-    await finish("failed", 0, {
-      teams_checked: 0,
-      teams_updated: 0,
-      rows_upserted: 0,
-      budget_exhausted: false,
-      teams: [],
-    }, teamsError.message);
+    const jobRunError = await report("failed", 0, emptyDetail, teamsError.message);
     return {
       status: "failed",
-      teams_checked: 0,
-      teams_updated: 0,
-      rows_upserted: 0,
-      budget_exhausted: false,
-      teams: [],
+      ...emptyDetail,
       message: teamsError.message,
+      ...(jobRunError ? { job_run_error: jobRunError } : {}),
     };
   }
+
 
   const targets = teams ?? [];
   const perTeam: TeamHistoryTeamResult[] = [];
