@@ -979,6 +979,75 @@ export type Database = {
           },
         ]
       }
+      team_history: {
+        Row: {
+          category_name: string | null
+          competition_name: string | null
+          created_at: string
+          external_id: string
+          fetched_at: string
+          goals_against: number | null
+          goals_for: number | null
+          id: string
+          is_home: boolean
+          opponent_external_id: string | null
+          opponent_name: string | null
+          played_at: string | null
+          raw: Json | null
+          result: string | null
+          season: string | null
+          source: string
+          team_external_id: string
+          tournament_id: string | null
+          unique_tournament_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          category_name?: string | null
+          competition_name?: string | null
+          created_at?: string
+          external_id: string
+          fetched_at?: string
+          goals_against?: number | null
+          goals_for?: number | null
+          id?: string
+          is_home: boolean
+          opponent_external_id?: string | null
+          opponent_name?: string | null
+          played_at?: string | null
+          raw?: Json | null
+          result?: string | null
+          season?: string | null
+          source?: string
+          team_external_id: string
+          tournament_id?: string | null
+          unique_tournament_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category_name?: string | null
+          competition_name?: string | null
+          created_at?: string
+          external_id?: string
+          fetched_at?: string
+          goals_against?: number | null
+          goals_for?: number | null
+          id?: string
+          is_home?: boolean
+          opponent_external_id?: string | null
+          opponent_name?: string | null
+          played_at?: string | null
+          raw?: Json | null
+          result?: string | null
+          season?: string | null
+          source?: string
+          team_external_id?: string
+          tournament_id?: string | null
+          unique_tournament_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       teams: {
         Row: {
           clubelo_rating: number | null
