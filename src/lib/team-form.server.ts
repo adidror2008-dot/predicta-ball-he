@@ -106,6 +106,15 @@ export async function getTeamForm(input: GetTeamFormInput): Promise<TeamFormResu
 
   const knownTeams = new Set((teams ?? []).map((t) => String(t.external_id)));
 
+  const { data: comps } = await supabaseAdmin
+    .from("competitions")
+    .select("tournament_id, display_type")
+    .not("tournament_id", "is", null);
+
+  const displayTypeByTournament = new Map<string, string | null>(
+    (comps ?? []).map((c) => [String(c.tournament_id), c.display_type]),
+  );
+
   type Row = (typeof history)[number];
 
   const classify = (row: Row): { tier: MatchTier; opponentKnown: boolean } => {
@@ -115,7 +124,11 @@ export async function getTeamForm(input: GetTeamFormInput): Promise<TeamFormResu
     const isFriendly =
       row.unique_tournament_id === FRIENDLY_TOURNAMENT_ID || compName.includes("friendl");
     if (isFriendly) return { tier: "friendly", opponentKnown };
-    if (row.category_name === "Israel" && !opponentKnown) {
+
+    const utid = row.unique_tournament_id == null ? null : String(row.unique_tournament_id);
+    const displayType = utid == null ? undefined : displayTypeByTournament.get(utid);
+
+    if (row.category_name === "Israel" && displayType === "cup" && !opponentKnown) {
       return { tier: "weak_opponent", opponentKnown };
     }
     return { tier: "official", opponentKnown };
