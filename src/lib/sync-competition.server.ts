@@ -14,7 +14,7 @@ export async function runSyncCompetition(data: { tournamentId: number }): Promis
 
     const tournamentId = data.tournamentId;
     const jobName = `sync-competition-${tournamentId}`;
-    const apiKey = process.env["SOFASCORE_API_KEY"];
+    const apiKey = process.env["SPORTAPI_API_KEY"];
 
     const started = new Date().toISOString();
     const finish = async (
@@ -35,13 +35,13 @@ export async function runSyncCompetition(data: { tournamentId: number }): Promis
     };
 
     if (!apiKey) {
-      await finish("failed", 0, {}, "SOFASCORE_API_KEY missing");
+      await finish("failed", 0, {}, "SPORTAPI_API_KEY missing");
       return {
         status: "error",
         teams_upserted: 0,
         matches_upserted: 0,
         season_chosen: null,
-        message: "SOFASCORE_API_KEY missing",
+        message: "SPORTAPI_API_KEY missing",
       };
     }
 
