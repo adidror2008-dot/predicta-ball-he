@@ -192,53 +192,45 @@ export async function runSyncCompetition(data: { tournamentId: number }): Promis
       };
     };
 
-    // 1. discover Israel category
+    // 1. discover category via tournament lookup
     if (!(await takeBudget("bulk"))) {
-      return stopPartial("budget_exhausted_at_categories");
+      return stopPartial("budget_exhausted_at_category_lookup");
     }
-    const catsRes = await call(`/api/v1/sport/football/${dayStr(today)}/0/categories`);
-    if (!catsRes.ok || !catsRes.json) {
+    const tournamentRes = await call(`/api/v1/unique-tournament/${tournamentId}`);
+    if (!tournamentRes.ok || !tournamentRes.json) {
       await finish(
         "failed",
         0,
-        { stage: "categories", http_status: catsRes.status, season_chosen: seasonId },
-        catsRes.body.slice(0, 500),
+        { stage: "category-lookup", http_status: tournamentRes.status, season_chosen: seasonId },
+        tournamentRes.body.slice(0, 500),
       );
       return {
         status: "error",
         teams_upserted: 0,
         matches_upserted: 0,
         season_chosen: seasonId,
-        message: `categories request failed (${catsRes.status}): ${catsRes.body.slice(0, 200)}`,
+        message: `tournament lookup failed (${tournamentRes.status}): ${tournamentRes.body.slice(0, 200)}`,
       };
     }
 
-    const categories: Array<Record<string, any>> =
-      catsRes.json["categories"] ?? catsRes.json["data"]?.["categories"] ?? [];
-    const israel = categories.find((c) => {
-      const name = String(c["name"] ?? "").toLowerCase();
-      const slug = String(c["slug"] ?? "").toLowerCase();
-      const flag = String(c["flag"] ?? "").toLowerCase();
-      const alpha = String(c["alpha2"] ?? "").toLowerCase();
-      return name === "israel" || slug === "israel" || flag === "israel" || alpha === "il";
-    });
-
-    if (!israel) {
+    const categoryIdRaw = tournamentRes.json["uniqueTournament"]?.["category"]?.["id"];
+    if (categoryIdRaw == null) {
       await finish(
         "failed",
         0,
-        { stage: "categories", season_chosen: seasonId, categories_count: categories.length },
-        "israel category not found",
+        { stage: "category-lookup", season_chosen: seasonId },
+        "category.id missing in tournament response",
       );
       return {
         status: "error",
         teams_upserted: 0,
         matches_upserted: 0,
         season_chosen: seasonId,
-        message: "israel category not found",
+        message: "category.id missing in tournament response",
       };
     }
-    categoryId = Number(israel["id"]);
+    categoryId = Number(categoryIdRaw);
+
 
     // 2. day by day scheduled events
     for (let i = 0; i <= 21; i++) {
