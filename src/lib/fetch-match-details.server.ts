@@ -371,9 +371,18 @@ export async function runFetchMatchDetails(data: {
       .filter((r): r is NonNullable<typeof r> => r !== null);
 
     if (rows.length > 0) {
-      const { error } = await supabaseAdmin
+      // events' uniqueness is a PARTIAL unique index (external_id IS NOT NULL),
+      // which PostgREST cannot target with ON CONFLICT — delete-then-insert instead.
+      const { error: delError } = await supabaseAdmin
         .from("events")
-        .upsert(rows, { onConflict: "external_id,source" });
+        .delete()
+        .eq("source", SOURCE)
+        .in(
+          "external_id",
+          rows.map((r) => r.external_id),
+        );
+      if (delError) problems.push(`events(delete): ${delError.message}`);
+      const { error } = await supabaseAdmin.from("events").insert(rows);
       if (error) problems.push(`events: ${error.message}`);
       else eventsUpserted = rows.length;
     }
