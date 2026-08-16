@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const SOFASCORE_HOST = "sofascore.p.rapidapi.com";
+const SOFASCORE_HOST = "sportapi7.p.rapidapi.com";
 
 export type SyncResult = {
   status: "success" | "partial" | "skipped" | "error";
