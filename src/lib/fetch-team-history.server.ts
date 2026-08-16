@@ -216,7 +216,30 @@ export async function runFetchTeamHistory(
     teams: perTeam,
   };
 
-  await finish("succeeded", teamsUpdated, detail);
+  const failedTeams = perTeam.filter((t) => !t.ok);
+  let status: JobRunStatus;
+  if (targets.length === 0) {
+    status = "skipped";
+  } else if (failedTeams.length > 0 || budgetExhausted) {
+    status = "partial";
+  } else {
+    status = "success";
+  }
 
-  return { status: "succeeded", ...detail };
+  const errorSummary =
+    failedTeams.length > 0
+      ? failedTeams.map((t) => `${t.team_external_id}: ${t.error ?? "unknown"}`).join("; ")
+      : budgetExhausted
+        ? "budget exhausted; some teams unprocessed"
+        : undefined;
+
+  const jobRunError = await report(status, teamsUpdated, detail, errorSummary);
+
+  return {
+    status,
+    ...detail,
+    ...(errorSummary ? { message: errorSummary } : {}),
+    ...(jobRunError ? { job_run_error: jobRunError } : {}),
+  };
 }
+
