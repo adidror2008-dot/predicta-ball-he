@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeftRight, CircleAlert, Goal, RectangleVertical, Video } from "lucide-react";
+import { ArrowLeftRight, CircleAlert, RectangleVertical, Video, Volleyball } from "lucide-react";
 import type { ReactNode } from "react";
 import { EmptyState, LtrNum, SkeletonBlock } from "./ui-bits";
 import { getIncidentsFn } from "@/lib/match-details-read.functions";
@@ -21,11 +21,11 @@ function iconFor(type: string | null): ReactNode {
     case "goal":
     case "penalty_goal":
     case "own_goal":
-      return <Goal className="size-4" aria-hidden />;
+      return <Volleyball className="size-4 text-brand" aria-hidden />;
     case "yellow_card":
-      return <RectangleVertical className="size-4 text-status-draw" aria-hidden />;
+      return <RectangleVertical className="size-4 rounded-[2px] fill-yellow-400 text-yellow-400" aria-hidden />;
     case "red_card":
-      return <RectangleVertical className="size-4 text-status-loss" aria-hidden />;
+      return <RectangleVertical className="size-4 rounded-[2px] fill-status-loss text-status-loss" aria-hidden />;
     case "substitution":
       return <ArrowLeftRight className="size-4" aria-hidden />;
     case "var":
@@ -58,7 +58,7 @@ export function MatchEventsTab({ matchRef }: { matchRef: string }) {
   }
 
   const events = data ?? [];
-  if (events.length === 0) return <EmptyState text="אין אירועים להצגה" />;
+  if (events.length === 0) return <EmptyState text="אין אירועים עדיין" />;
 
   return (
     <ol className="flex flex-col gap-2">

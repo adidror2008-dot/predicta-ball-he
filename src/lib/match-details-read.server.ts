@@ -2,7 +2,33 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const SOURCE = "sofascore";
 const PHOTO_BUCKET = "player-photos";
+const LOGO_BUCKET = "team-logos";
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
+
+export type MatchHeader = {
+  id: string;
+  externalId: string | null;
+  status: string | null;
+  isFinished: boolean;
+  kickoffAt: string | null;
+  venue: string | null;
+  homeName: string | null;
+  awayName: string | null;
+  homeLogo: string | null;
+  awayLogo: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
+};
+
+export type MatchPrediction = {
+  predictedHomeScore: number | null;
+  predictedAwayScore: number | null;
+  probHome: number | null;
+  probDraw: number | null;
+  probAway: number | null;
+  confidence: number | null;
+  reasons: string[];
+};
 
 export type IncidentRow = {
   type: string | null;
@@ -24,6 +50,7 @@ export type LineupPlayer = {
   position: string | null;
   shirt_number: number | null;
   is_starting: boolean | null;
+  rating: number | null;
 };
 
 export type MatchLineupsResult = {
@@ -149,12 +176,25 @@ export async function getMatchLineups(
     for (const p of players ?? []) nameById.set(p.id, p.name_en ?? p.name_he ?? null);
   }
 
+  const ratingById = new Map<string, number | null>();
+  if (playerIds.length > 0) {
+    const { data: ratings } = await supabaseAdmin
+      .from("player_ratings")
+      .select("player_id, rating")
+      .eq("match_id", match.id)
+      .in("player_id", playerIds);
+    for (const r of ratings ?? []) {
+      if (r.player_id) ratingById.set(r.player_id, r.rating === null ? null : Number(r.rating));
+    }
+  }
+
   const toPlayer = (r: (typeof rows)[number]): LineupPlayer => ({
     player_id: r.player_id,
     name: r.player_id ? (nameById.get(r.player_id) ?? null) : null,
     position: r.position,
     shirt_number: r.shirt_number,
     is_starting: r.is_starting,
+    rating: r.player_id ? (ratingById.get(r.player_id) ?? null) : null,
   });
 
   const bySide = (teamId: string | null) =>
@@ -195,4 +235,104 @@ export async function getPlayerPhoto(playerExternalId: string): Promise<string |
     .createSignedUrl(data.storage_path, SIGNED_URL_TTL_SECONDS);
   if (signError || !signed?.signedUrl) return null;
   return signed.signedUrl;
+}
+
+async function signLogo(raw: string | null | undefined): Promise<string | null> {
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const { data } = await supabaseAdmin.storage
+    .from(LOGO_BUCKET)
+    .createSignedUrl(raw, SIGNED_URL_TTL_SECONDS);
+  return data?.signedUrl ?? null;
+}
+
+export async function getMatchHeader(matchRef: string): Promise<MatchHeader | null> {
+  const base = () =>
+    supabaseAdmin
+      .from("matches")
+      .select(
+        "id, external_id, status, kickoff_at, venue, home_team_id, away_team_id, home_score, away_score",
+      );
+
+  type MatchRow = {
+    id: string;
+    external_id: string | null;
+    status: string | null;
+    kickoff_at: string | null;
+    venue: string | null;
+    home_team_id: string | null;
+    away_team_id: string | null;
+    home_score: number | null;
+    away_score: number | null;
+  };
+  let row: MatchRow | null = null;
+
+  if (UUID_RE.test(matchRef)) {
+    const { data } = await base().eq("id", matchRef).maybeSingle();
+    row = data;
+  }
+  if (!row) {
+    const { data } = await base().eq("external_id", matchRef).eq("source", SOURCE).maybeSingle();
+    row = data;
+  }
+  if (!row) return null;
+
+  const teamIds = [row.home_team_id, row.away_team_id].filter((v): v is string => !!v);
+  const { data: teams } = teamIds.length
+    ? await supabaseAdmin.from("teams").select("id, name_he, name_en, logo_url").in("id", teamIds)
+    : { data: [] };
+
+  const byId = new Map((teams ?? []).map((t) => [t.id, t]));
+  const home = row.home_team_id ? byId.get(row.home_team_id) : undefined;
+  const away = row.away_team_id ? byId.get(row.away_team_id) : undefined;
+
+  const [homeLogo, awayLogo] = await Promise.all([
+    signLogo(home?.logo_url),
+    signLogo(away?.logo_url),
+  ]);
+
+  return {
+    id: row.id,
+    externalId: row.external_id,
+    status: row.status,
+    isFinished: row.status === "finished",
+    kickoffAt: row.kickoff_at,
+    venue: row.venue,
+    homeName: home?.name_he || home?.name_en || null,
+    awayName: away?.name_he || away?.name_en || null,
+    homeLogo,
+    awayLogo,
+    homeScore: row.home_score,
+    awayScore: row.away_score,
+  };
+}
+
+export async function getMatchPrediction(matchRef: string): Promise<MatchPrediction | null> {
+  const match = await resolveMatch(matchRef);
+  if (!match) return null;
+
+  const { data } = await supabaseAdmin
+    .from("predictions")
+    .select(
+      "predicted_home_score, predicted_away_score, prob_home, prob_draw, prob_away, confidence, reasons_he",
+    )
+    .eq("match_id", match.id)
+    .maybeSingle();
+  if (!data) return null;
+
+  const reasons = Array.isArray(data.reasons_he)
+    ? (data.reasons_he as unknown[]).filter((r): r is string => typeof r === "string")
+    : [];
+
+  const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+
+  return {
+    predictedHomeScore: data.predicted_home_score,
+    predictedAwayScore: data.predicted_away_score,
+    probHome: num(data.prob_home),
+    probDraw: num(data.prob_draw),
+    probAway: num(data.prob_away),
+    confidence: num(data.confidence),
+    reasons,
+  };
 }
