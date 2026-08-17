@@ -97,8 +97,9 @@ export function MatchHeaderCard({
             <span className="flex min-w-0 items-center gap-1.5">
               <MapPin className="size-3.5 shrink-0" aria-hidden />
               <span dir="auto" className="truncate">
-                מיקום: {header.venue}
+                מיקום: <VenueText venue={header.venue} />
               </span>
+
             </span>
             {header.homeName ? <span>מארחת: {header.homeName}</span> : null}
           </div>
