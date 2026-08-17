@@ -26,6 +26,8 @@ export type TickResult = {
   competitions_settled: number;
   matches_settled: number;
   needs_review_flagged: number;
+  lineups_prefetched: number;
+  finals_fetched: number;
   reason?: string;
 };
 
