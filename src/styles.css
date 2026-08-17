@@ -82,7 +82,7 @@
   --muted: var(--surface-2);
   /* #8FB0C6 */
   --muted-foreground: #8fb0c6;
-  --accent: var(--brand-2);
+  --accent: var(--surface-2);
   --accent-foreground: var(--foreground);
 
   --destructive: #e4484d;

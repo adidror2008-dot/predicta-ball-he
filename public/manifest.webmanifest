@@ -6,8 +6,8 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0A121C",
-  "theme_color": "#0A121C",
+  "background_color": "#041A33",
+  "theme_color": "#041A33",
   "icons": [
     {
       "src": "/predictaball_icon.svg",
