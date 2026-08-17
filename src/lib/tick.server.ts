@@ -112,53 +112,80 @@ export async function runTick(): Promise<TickResult> {
     )
     .order("kickoff_at", { ascending: true });
 
+  let lineupsPrefetched = 0;
+  let finalsFetched = 0;
+
+  const baseResult = (
+    status: TickResult["status"],
+    activeCount: number,
+    reason?: string,
+  ): TickResult => ({
+    status,
+    api_calls_made: apiCalls,
+    active_matches: activeCount,
+    live_matches_updated: liveUpdated,
+    stale_matches: staleCount,
+    competitions_settled: competitionsSettled,
+    matches_settled: matchesSettled,
+    needs_review_flagged: needsReviewFlagged,
+    lineups_prefetched: lineupsPrefetched,
+    finals_fetched: finalsFetched,
+    ...(reason ? { reason } : {}),
+  });
+
   if (activeError) {
     await finish("failed", { api_calls: apiCalls }, activeError.message);
-    return {
-      status: "failed",
-      api_calls_made: apiCalls,
-      active_matches: 0,
-      live_matches_updated: 0,
-      stale_matches: 0,
-      competitions_settled: 0,
-      matches_settled: 0,
-      needs_review_flagged: 0,
-      reason: activeError.message,
-    };
+    return baseResult("failed", 0, activeError.message);
   }
 
   const active = activeMatches ?? [];
-  if (active.length === 0) {
+
+  // ---- STEP 1b: lineup pre-fetch candidates (kickoff in 55-65 minutes, no lineups yet)
+  const { data: lineupWindowMatches } = await supabaseAdmin
+    .from("matches")
+    .select("id, external_id, kickoff_at")
+    .eq("source", SOURCE)
+    .not("external_id", "is", null)
+    .gte("kickoff_at", new Date(now + LINEUP_WINDOW_MIN_MS).toISOString())
+    .lte("kickoff_at", new Date(now + LINEUP_WINDOW_MAX_MS).toISOString())
+    .order("kickoff_at", { ascending: true })
+    .limit(20);
+
+  const lineupCandidates: Array<{ id: string; external_id: string | null }> = [];
+  for (const m of lineupWindowMatches ?? []) {
+    if (lineupCandidates.length >= MAX_LINEUP_FETCHES) break;
+    const { count } = await supabaseAdmin
+      .from("lineups")
+      .select("id", { count: "exact", head: true })
+      .eq("match_id", m.id);
+    if ((count ?? 0) === 0) lineupCandidates.push(m);
+  }
+
+  if (active.length === 0 && lineupCandidates.length === 0) {
     await finish("success", { reason: "nothing_active", api_calls: 0 });
-    return {
-      status: "success",
-      api_calls_made: 0,
-      active_matches: 0,
-      live_matches_updated: 0,
-      stale_matches: 0,
-      competitions_settled: 0,
-      matches_settled: 0,
-      needs_review_flagged: 0,
-      reason: "nothing_active",
-    };
+    return baseResult("success", 0, "nothing_active");
   }
 
   if (!apiKey) {
-    await finish("failed", { active_matches: active.length, api_calls: 0 }, "SPORTAPI_API_KEY missing");
-    return {
-      status: "failed",
-      api_calls_made: 0,
-      active_matches: active.length,
-      live_matches_updated: 0,
-      stale_matches: 0,
-      competitions_settled: 0,
-      matches_settled: 0,
-      needs_review_flagged: 0,
-      reason: "SPORTAPI_API_KEY missing",
-    };
+    await finish(
+      "failed",
+      { active_matches: active.length, api_calls: 0 },
+      "SPORTAPI_API_KEY missing",
+    );
+    return baseResult("failed", active.length, "SPORTAPI_API_KEY missing");
+  }
+
+  // The lineups fetcher owns its own budget gate ('lineups' category) and job_runs row.
+  for (const candidate of lineupCandidates) {
+    const { runFetchMatchLineups } = await import("@/lib/fetch-match-lineups.server");
+    const r = await runFetchMatchLineups({ matchExternalId: String(candidate.external_id) });
+    if (r.budget_exhausted) break;
+    apiCalls += r.http_status != null ? 1 : 0;
+    if (r.lineups_upserted > 0) lineupsPrefetched += 1;
   }
 
   const byExternalId = new Map(active.map((m) => [String(m.external_id), m]));
+
 
   // ---- STEP 2: one live sweep for the whole world
   const seenLive = new Set<string>();
