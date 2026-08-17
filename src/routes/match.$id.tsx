@@ -1,10 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { ChevronRight } from "lucide-react";
-import { EmptyState, LogoSlot } from "@/components/predictaball/ui-bits";
+import { SectionTitle } from "@/components/predictaball/ui-bits";
+import { MatchHeaderCard } from "@/components/predictaball/match-header-card";
+import { MatchPredictionSection } from "@/components/predictaball/match-prediction-section";
+import { MatchPitchLineups } from "@/components/predictaball/match-pitch-lineups";
 import { MatchEventsTab } from "@/components/predictaball/match-events-tab";
-import { MatchLineupsTab } from "@/components/predictaball/match-lineups-tab";
-import { cn } from "@/lib/utils";
+import { getMatchHeaderFn } from "@/lib/match-details-read.functions";
 
 export const Route = createFileRoute("/match/$id")({
   head: () => ({
@@ -12,35 +15,29 @@ export const Route = createFileRoute("/match/$id")({
       { title: "פרטי משחק — PredictaBall" },
       {
         name: "description",
-        content: "הרכבים, אירועים, סטטיסטיקות, דירוגים, טבלה ותחזית למשחק.",
+        content: "תוצאה, תחזית, הרכבים ואירועי המשחק במסך אחד.",
       },
       { property: "og:title", content: "פרטי משחק — PredictaBall" },
       {
         property: "og:description",
-        content: "הרכבים, אירועים, סטטיסטיקות, דירוגים, טבלה ותחזית למשחק.",
+        content: "תוצאה, תחזית, הרכבים ואירועי המשחק במסך אחד.",
       },
     ],
   }),
   component: MatchPage,
 });
 
-const tabs = [
-  { id: "lineups", label: "הרכבים", empty: "טרם פורסם הרכב רשמי" },
-  { id: "events", label: "אירועים", empty: "אין אירועים להצגה" },
-  { id: "stats", label: "סטטיסטיקות", empty: "אין סטטיסטיקות להצגה" },
-  { id: "ratings", label: "דירוגים", empty: "אין דירוגים להצגה" },
-  { id: "table", label: "טבלה", empty: "הטבלה תתעדכן עם תחילת העונה" },
-  { id: "forecast", label: "תחזית", empty: "אין מספיק נתונים לתחזית" },
-] as const;
-
 function MatchPage() {
   const { id } = Route.useParams();
-  const [active, setActive] = useState<(typeof tabs)[number]["id"]>("lineups");
-  const activeTab = tabs.find((t) => t.id === active)!;
+  const fetchHeader = useServerFn(getMatchHeaderFn);
+  const { data: header, isPending } = useQuery({
+    queryKey: ["match-header", id],
+    queryFn: () => fetchHeader({ data: { matchExternalId: id } }),
+  });
 
   return (
-    <main className="px-4 pt-5">
-      <header className="mb-4 flex items-center gap-2">
+    <main className="flex flex-col gap-6 px-4 pt-5 pb-8">
+      <header className="flex items-center gap-2">
         <Link
           to="/"
           aria-label="חזרה"
@@ -51,49 +48,24 @@ function MatchPage() {
         <h1 className="text-lg font-bold">פרטי משחק</h1>
       </header>
 
-      <section className="rounded-2xl bg-card p-4 shadow-card">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex flex-1 flex-col items-center gap-2">
-            <LogoSlot className="size-12" />
-            <span className="text-xs text-muted-foreground">—</span>
-          </div>
-          <span dir="ltr" className="text-2xl font-bold text-muted-foreground">
-            —
-          </span>
-          <div className="flex flex-1 flex-col items-center gap-2">
-            <LogoSlot className="size-12" />
-            <span className="text-xs text-muted-foreground">—</span>
-          </div>
-        </div>
+      <MatchHeaderCard header={header} isPending={isPending} />
+
+      <section>
+        <SectionTitle>תחזית</SectionTitle>
+        <MatchPredictionSection matchRef={id} header={header} />
       </section>
 
-      <div className="scrollbar-none -mx-4 mt-4 flex gap-2 overflow-x-auto px-4">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActive(tab.id)}
-            className={cn(
-              "shrink-0 rounded-2xl px-3 py-1.5 text-xs font-medium transition-colors",
-              active === tab.id
-                ? "bg-brand-gradient text-brand-foreground"
-                : "bg-surface text-muted-foreground",
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <section>
+        <SectionTitle>הרכבים</SectionTitle>
+        <MatchPitchLineups matchRef={id} />
+      </section>
 
-      <section className="mt-4">
-        {active === "lineups" ? (
-          <MatchLineupsTab matchRef={id} />
-        ) : active === "events" ? (
+      {header?.isFinished ? (
+        <section>
+          <SectionTitle>אירועי המשחק</SectionTitle>
           <MatchEventsTab matchRef={id} />
-        ) : (
-          <EmptyState text={activeTab.empty} />
-        )}
-      </section>
+        </section>
+      ) : null}
     </main>
   );
 }
