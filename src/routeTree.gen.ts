@@ -14,6 +14,8 @@ import { Route as NewsRouteImport } from './routes/news'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as MatchIdRouteImport } from './routes/match.$id'
 import { Route as ApiPublicDiscoverSeasonsRouteImport } from './routes/api/public/discover-seasons'
+import { Route as ApiPublicFetchTeamHistoryRouteImport } from './routes/api/public/fetch-team-history'
+import { Route as ApiPublicSyncCompetitionsRouteImport } from './routes/api/public/sync-competitions'
 import { Route as ApiPublicSyncFixturesDailyRouteImport } from './routes/api/public/sync-fixtures-daily'
 import { Route as ApiPublicTickRouteImport } from './routes/api/public/tick'
 import { Route as ApiPublicVerifyEndpointsRouteImport } from './routes/api/public/verify-endpoints'
@@ -44,6 +46,18 @@ const ApiPublicDiscoverSeasonsRoute =
     path: '/api/public/discover-seasons',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicFetchTeamHistoryRoute =
+  ApiPublicFetchTeamHistoryRouteImport.update({
+    id: '/api/public/fetch-team-history',
+    path: '/api/public/fetch-team-history',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSyncCompetitionsRoute =
+  ApiPublicSyncCompetitionsRouteImport.update({
+    id: '/api/public/sync-competitions',
+    path: '/api/public/sync-competitions',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicSyncFixturesDailyRoute =
   ApiPublicSyncFixturesDailyRouteImport.update({
     id: '/api/public/sync-fixtures-daily',
@@ -68,6 +82,8 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/match/$id': typeof MatchIdRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
+  '/api/public/fetch-team-history': typeof ApiPublicFetchTeamHistoryRoute
+  '/api/public/sync-competitions': typeof ApiPublicSyncCompetitionsRoute
   '/api/public/sync-fixtures-daily': typeof ApiPublicSyncFixturesDailyRoute
   '/api/public/tick': typeof ApiPublicTickRoute
   '/api/public/verify-endpoints': typeof ApiPublicVerifyEndpointsRoute
@@ -78,6 +94,8 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/match/$id': typeof MatchIdRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
+  '/api/public/fetch-team-history': typeof ApiPublicFetchTeamHistoryRoute
+  '/api/public/sync-competitions': typeof ApiPublicSyncCompetitionsRoute
   '/api/public/sync-fixtures-daily': typeof ApiPublicSyncFixturesDailyRoute
   '/api/public/tick': typeof ApiPublicTickRoute
   '/api/public/verify-endpoints': typeof ApiPublicVerifyEndpointsRoute
@@ -89,6 +107,8 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/match/$id': typeof MatchIdRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
+  '/api/public/fetch-team-history': typeof ApiPublicFetchTeamHistoryRoute
+  '/api/public/sync-competitions': typeof ApiPublicSyncCompetitionsRoute
   '/api/public/sync-fixtures-daily': typeof ApiPublicSyncFixturesDailyRoute
   '/api/public/tick': typeof ApiPublicTickRoute
   '/api/public/verify-endpoints': typeof ApiPublicVerifyEndpointsRoute
@@ -101,6 +121,8 @@ export interface FileRouteTypes {
     | '/settings'
     | '/match/$id'
     | '/api/public/discover-seasons'
+    | '/api/public/fetch-team-history'
+    | '/api/public/sync-competitions'
     | '/api/public/sync-fixtures-daily'
     | '/api/public/tick'
     | '/api/public/verify-endpoints'
@@ -111,6 +133,8 @@ export interface FileRouteTypes {
     | '/settings'
     | '/match/$id'
     | '/api/public/discover-seasons'
+    | '/api/public/fetch-team-history'
+    | '/api/public/sync-competitions'
     | '/api/public/sync-fixtures-daily'
     | '/api/public/tick'
     | '/api/public/verify-endpoints'
@@ -121,6 +145,8 @@ export interface FileRouteTypes {
     | '/settings'
     | '/match/$id'
     | '/api/public/discover-seasons'
+    | '/api/public/fetch-team-history'
+    | '/api/public/sync-competitions'
     | '/api/public/sync-fixtures-daily'
     | '/api/public/tick'
     | '/api/public/verify-endpoints'
@@ -132,6 +158,8 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   MatchIdRoute: typeof MatchIdRoute
   ApiPublicDiscoverSeasonsRoute: typeof ApiPublicDiscoverSeasonsRoute
+  ApiPublicFetchTeamHistoryRoute: typeof ApiPublicFetchTeamHistoryRoute
+  ApiPublicSyncCompetitionsRoute: typeof ApiPublicSyncCompetitionsRoute
   ApiPublicSyncFixturesDailyRoute: typeof ApiPublicSyncFixturesDailyRoute
   ApiPublicTickRoute: typeof ApiPublicTickRoute
   ApiPublicVerifyEndpointsRoute: typeof ApiPublicVerifyEndpointsRoute
@@ -174,6 +202,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicDiscoverSeasonsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/fetch-team-history': {
+      id: '/api/public/fetch-team-history'
+      path: '/api/public/fetch-team-history'
+      fullPath: '/api/public/fetch-team-history'
+      preLoaderRoute: typeof ApiPublicFetchTeamHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/sync-competitions': {
+      id: '/api/public/sync-competitions'
+      path: '/api/public/sync-competitions'
+      fullPath: '/api/public/sync-competitions'
+      preLoaderRoute: typeof ApiPublicSyncCompetitionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/sync-fixtures-daily': {
       id: '/api/public/sync-fixtures-daily'
       path: '/api/public/sync-fixtures-daily'
@@ -204,6 +246,8 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   MatchIdRoute: MatchIdRoute,
   ApiPublicDiscoverSeasonsRoute: ApiPublicDiscoverSeasonsRoute,
+  ApiPublicFetchTeamHistoryRoute: ApiPublicFetchTeamHistoryRoute,
+  ApiPublicSyncCompetitionsRoute: ApiPublicSyncCompetitionsRoute,
   ApiPublicSyncFixturesDailyRoute: ApiPublicSyncFixturesDailyRoute,
   ApiPublicTickRoute: ApiPublicTickRoute,
   ApiPublicVerifyEndpointsRoute: ApiPublicVerifyEndpointsRoute,
