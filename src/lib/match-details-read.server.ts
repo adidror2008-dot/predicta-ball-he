@@ -91,6 +91,12 @@ export async function getIncidents(matchExternalId: string): Promise<IncidentRow
       minute: r.minute,
       added_minute: r.added_minute,
       team_id: r.team_id,
+      side:
+        r.team_id && r.team_id === match.home_team_id
+          ? ("home" as const)
+          : r.team_id && r.team_id === match.away_team_id
+            ? ("away" as const)
+            : null,
       player_id: r.player_id,
       player_name: r.player_id ? (nameById.get(r.player_id) ?? null) : null,
       related_player_name: r.related_player_id
