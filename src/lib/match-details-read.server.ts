@@ -254,8 +254,18 @@ export async function getMatchHeader(matchRef: string): Promise<MatchHeader | nu
         "id, external_id, status, kickoff_at, venue, home_team_id, away_team_id, home_score, away_score",
       );
 
-  let row: Awaited<ReturnType<typeof base>>["data"] extends (infer T)[] | null ? T | null : never =
-    null;
+  type MatchRow = {
+    id: string;
+    external_id: string | null;
+    status: string | null;
+    kickoff_at: string | null;
+    venue: string | null;
+    home_team_id: string | null;
+    away_team_id: string | null;
+    home_score: number | null;
+    away_score: number | null;
+  };
+  let row: MatchRow | null = null;
 
   if (UUID_RE.test(matchRef)) {
     const { data } = await base().eq("id", matchRef).maybeSingle();
