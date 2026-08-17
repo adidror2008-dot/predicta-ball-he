@@ -1,5 +1,6 @@
 import { CalendarDays, Clock, MapPin } from "lucide-react";
 import { LogoSlot, LtrNum, SkeletonBlock } from "./ui-bits";
+import { VenueText } from "./venue-text";
 import type { MatchHeader } from "@/lib/match-details-read.server";
 
 function formatDate(iso: string | null) {
