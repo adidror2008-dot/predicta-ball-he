@@ -94,9 +94,11 @@ export function MatchHeaderCard({
         </div>
         {header.venue ? (
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <MapPin className="size-3.5" aria-hidden />
-              <span dir="auto">{header.venue}</span>
+            <span className="flex min-w-0 items-center gap-1.5">
+              <MapPin className="size-3.5 shrink-0" aria-hidden />
+              <span dir="auto" className="truncate">
+                מיקום: {header.venue}
+              </span>
             </span>
             {header.homeName ? <span>מארחת: {header.homeName}</span> : null}
           </div>
