@@ -35,7 +35,7 @@ export async function runFetchTeamLogosNames(
 ): Promise<FetchTeamLogosNamesResult> {
   const startedAt = new Date().toISOString();
   const apiKey = process.env["SPORTAPI_API_KEY"];
-  const limit = Math.max(1, Math.min(Number(data.limit ?? 20), 50));
+  const limit = Math.max(1, Math.min(Number(data.limit ?? 25), 200));
 
   let teamsConsidered = 0;
   let teamsUpdated = 0;
@@ -81,12 +81,21 @@ export async function runFetchTeamLogosNames(
     return finish("failed", "missing SPORTAPI_API_KEY");
   }
 
+  // Always stamp the attempt, so a team with no available logo is not retried forever.
+  const markChecked = async (teamId: string) => {
+    await supabaseAdmin
+      .from("teams")
+      .update({ logo_checked_at: new Date().toISOString() })
+      .eq("id", teamId);
+  };
+
   let query = supabaseAdmin
     .from("teams")
     .select("id, external_id, name_en, name_he, logo_url")
     .eq("source", SOURCE)
     .not("external_id", "is", null)
     .is("logo_url", null)
+    .or(`logo_checked_at.is.null,logo_checked_at.lt.${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()}`)
     .limit(limit);
   if (data.teamExternalId) query = query.eq("external_id", String(data.teamExternalId));
 
@@ -123,6 +132,7 @@ export async function runFetchTeamLogosNames(
       headers: { "x-rapidapi-key": apiKey, "x-rapidapi-host": SOFASCORE_HOST },
     });
     if (!res.ok) {
+      await markChecked(team.id);
       outcomes.push({
         team_id: team.id,
         external_id: externalId,
@@ -136,6 +146,7 @@ export async function runFetchTeamLogosNames(
     const contentType = res.headers.get("content-type") ?? "image/png";
     const bytes = new Uint8Array(await res.arrayBuffer());
     if (bytes.byteLength === 0) {
+      await markChecked(team.id);
       outcomes.push({
         team_id: team.id,
         external_id: externalId,
@@ -153,6 +164,7 @@ export async function runFetchTeamLogosNames(
       .from(BUCKET)
       .upload(storagePath, bytes, { contentType, upsert: true });
     if (uploadError) {
+      await markChecked(team.id);
       outcomes.push({
         team_id: team.id,
         external_id: externalId,
@@ -169,6 +181,7 @@ export async function runFetchTeamLogosNames(
       .update({ logo_url: storagePath, logo_checked_at: new Date().toISOString() })
       .eq("id", team.id);
     if (updateError) {
+      await markChecked(team.id);
       outcomes.push({
         team_id: team.id,
         external_id: externalId,
@@ -189,6 +202,7 @@ export async function runFetchTeamLogosNames(
   }
 
   if (teamsUpdated === 0) return finish("failed", "no team was updated");
+
   if (teamsUpdated < teamsConsidered) {
     return finish("partial", budgetExhausted ? "budget exhausted mid-run" : "some teams failed");
   }
