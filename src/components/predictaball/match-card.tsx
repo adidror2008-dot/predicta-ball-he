@@ -8,12 +8,15 @@ export type MatchCardData = {
   id: string;
   homeName: string;
   awayName: string;
+  homeLogo?: string | null;
+  awayLogo?: string | null;
   homeScore: number | null;
   awayScore: number | null;
   kickoffTime: string | null;
   date: string | null;
   status: MatchStatus;
 };
+
 
 const statusLabel: Record<MatchStatus, string> = {
   scheduled: "טרם החל",
