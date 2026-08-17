@@ -10,6 +10,7 @@ export type SeasonDiscoveryRow = {
   season_year: string | null;
   expected_year: string | null;
   matched_exactly: boolean;
+  current_season_confirmed: boolean;
   http_status: number | null;
   note?: "quota_blocked" | "request_failed" | "no_seasons" | "update_failed";
 };
@@ -62,6 +63,7 @@ export async function runDiscoverSeasons(): Promise<DiscoverSeasonsResult> {
       season_year: null,
       expected_year: expected,
       matched_exactly: false,
+      current_season_confirmed: false,
       http_status: null,
     };
 
@@ -112,9 +114,26 @@ export async function runDiscoverSeasons(): Promise<DiscoverSeasonsResult> {
     const chosen = matched ?? seasons[0]!;
     const seasonId = String(chosen.id);
 
+    // Derived confirmation: even a loose match counts when the competition
+    // already holds matches in the computed current season.
+    let hasCurrentSeasonMatch = false;
+    if (expected) {
+      const { count } = await supabaseAdmin
+        .from("matches")
+        .select("id", { count: "exact", head: true })
+        .eq("competition_id", comp.id)
+        .eq("season", expected);
+      hasCurrentSeasonMatch = (count ?? 0) > 0;
+    }
+    const confirmed = Boolean(matched) || hasCurrentSeasonMatch;
+
     const { error: updateError } = await supabaseAdmin
       .from("competitions")
-      .update({ current_season_id: seasonId, fetched_at: new Date().toISOString() })
+      .update({
+        current_season_id: seasonId,
+        current_season_confirmed: confirmed,
+        fetched_at: new Date().toISOString(),
+      })
       .eq("id", comp.id);
 
     results.push({
@@ -123,6 +142,7 @@ export async function runDiscoverSeasons(): Promise<DiscoverSeasonsResult> {
       current_season_id: seasonId,
       season_year: chosen.year ?? null,
       matched_exactly: Boolean(matched),
+      current_season_confirmed: confirmed,
       http_status: httpStatus,
       ...(updateError ? { note: "update_failed" as const } : {}),
     });
