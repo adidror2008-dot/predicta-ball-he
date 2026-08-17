@@ -36,11 +36,13 @@ function isQualifier(roundInfo: Record<string, any> | null | undefined): boolean
 export async function runSyncCompetition(data: {
   tournamentId: number;
   mode?: SyncMode;
+  maxPages?: number;
 }): Promise<SyncResult> {
   const tournamentId = data.tournamentId;
   const mode: SyncMode = data.mode ?? "both";
   const directions: SyncDirection[] =
     mode === "both" ? ["next", "last"] : [mode];
+  const maxPages = Math.max(1, Math.min(Number(data.maxPages ?? MAX_PAGES), MAX_PAGES));
   const jobName = `sync-competition-${tournamentId}`;
   const apiKey = process.env["SPORTAPI_API_KEY"];
   const started = new Date().toISOString();
@@ -168,7 +170,7 @@ export async function runSyncCompetition(data: {
       continue;
     }
 
-    for (let page = 0; page < MAX_PAGES; page++) {
+    for (let page = 0; page < maxPages; page++) {
       if (!(await takeBudget())) {
         budgetExhausted = true;
         counter.stopped_reason = `budget_exhausted_at_page_${page}`;
@@ -249,7 +251,7 @@ export async function runSyncCompetition(data: {
         counter.stopped_reason = "no_more_pages";
         break;
       }
-      if (page === MAX_PAGES - 1) counter.stopped_reason = "page_cap_reached";
+      if (page === maxPages - 1) counter.stopped_reason = "page_cap_reached";
     }
   }
 

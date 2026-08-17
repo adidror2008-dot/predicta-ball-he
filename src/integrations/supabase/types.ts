@@ -161,6 +161,7 @@ export type Database = {
         Row: {
           country: string | null
           created_at: string
+          current_season_confirmed: boolean
           current_season_id: string | null
           display_type: string | null
           external_id: string | null
@@ -180,6 +181,7 @@ export type Database = {
         Insert: {
           country?: string | null
           created_at?: string
+          current_season_confirmed?: boolean
           current_season_id?: string | null
           display_type?: string | null
           external_id?: string | null
@@ -199,6 +201,7 @@ export type Database = {
         Update: {
           country?: string | null
           created_at?: string
+          current_season_confirmed?: boolean
           current_season_id?: string | null
           display_type?: string | null
           external_id?: string | null
