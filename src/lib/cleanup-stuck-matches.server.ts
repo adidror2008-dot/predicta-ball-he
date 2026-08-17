@@ -146,7 +146,7 @@ export async function runCleanupStuckMatches(options?: { dryRun?: boolean }): Pr
         update["kickoff_at"] = apiKickoff;
       }
     }
-    const { error } = await supabaseAdmin.from("matches").update(update).eq("id", m.id);
+    const { error } = await supabaseAdmin.from("matches").update(update as never).eq("id", m.id);
     if (!error) resolved += 1;
   };
 
@@ -175,7 +175,7 @@ export async function runCleanupStuckMatches(options?: { dryRun?: boolean }): Pr
           live_source: SOURCE,
           fetched_at: new Date().toISOString(),
         };
-        const { error } = await supabaseAdmin.from("matches").update(update).eq("id", m.id);
+        const { error } = await supabaseAdmin.from("matches").update(update as never).eq("id", m.id);
         if (!error) resolved += 1;
       }
     }
