@@ -2,7 +2,33 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const SOURCE = "sofascore";
 const PHOTO_BUCKET = "player-photos";
+const LOGO_BUCKET = "team-logos";
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
+
+export type MatchHeader = {
+  id: string;
+  externalId: string | null;
+  status: string | null;
+  isFinished: boolean;
+  kickoffAt: string | null;
+  venue: string | null;
+  homeName: string | null;
+  awayName: string | null;
+  homeLogo: string | null;
+  awayLogo: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
+};
+
+export type MatchPrediction = {
+  predictedHomeScore: number | null;
+  predictedAwayScore: number | null;
+  probHome: number | null;
+  probDraw: number | null;
+  probAway: number | null;
+  confidence: number | null;
+  reasons: string[];
+};
 
 export type IncidentRow = {
   type: string | null;
