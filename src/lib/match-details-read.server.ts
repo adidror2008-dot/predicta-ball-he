@@ -9,6 +9,7 @@ export type IncidentRow = {
   minute: number | null;
   added_minute: number | null;
   team_id: string | null;
+  side: "home" | "away" | null;
   player_id: string | null;
   player_name: string | null;
   related_player_name: string | null;
@@ -33,11 +34,20 @@ export type MatchLineupsResult = {
   awayFormation: string | null;
 };
 
-async function resolveMatch(matchExternalId: string) {
-  const { data, error } = await supabaseAdmin
-    .from("matches")
-    .select("id, home_team_id, away_team_id")
-    .eq("external_id", matchExternalId)
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Accepts either the internal matches.id (uuid) or the provider external_id.
+async function resolveMatch(matchRef: string) {
+  const base = () => supabaseAdmin.from("matches").select("id, home_team_id, away_team_id");
+
+  if (UUID_RE.test(matchRef)) {
+    const { data, error } = await base().eq("id", matchRef).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (data) return data;
+  }
+
+  const { data, error } = await base()
+    .eq("external_id", matchRef)
     .eq("source", SOURCE)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -81,6 +91,12 @@ export async function getIncidents(matchExternalId: string): Promise<IncidentRow
       minute: r.minute,
       added_minute: r.added_minute,
       team_id: r.team_id,
+      side:
+        r.team_id && r.team_id === match.home_team_id
+          ? ("home" as const)
+          : r.team_id && r.team_id === match.away_team_id
+            ? ("away" as const)
+            : null,
       player_id: r.player_id,
       player_name: r.player_id ? (nameById.get(r.player_id) ?? null) : null,
       related_player_name: r.related_player_id

@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { EmptyState, LogoSlot } from "@/components/predictaball/ui-bits";
+import { MatchEventsTab } from "@/components/predictaball/match-events-tab";
+import { MatchLineupsTab } from "@/components/predictaball/match-lineups-tab";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/match/$id")({
@@ -32,6 +34,7 @@ const tabs = [
 ] as const;
 
 function MatchPage() {
+  const { id } = Route.useParams();
   const [active, setActive] = useState<(typeof tabs)[number]["id"]>("lineups");
   const activeTab = tabs.find((t) => t.id === active)!;
 
@@ -83,7 +86,13 @@ function MatchPage() {
       </div>
 
       <section className="mt-4">
-        <EmptyState text={activeTab.empty} />
+        {active === "lineups" ? (
+          <MatchLineupsTab matchRef={id} />
+        ) : active === "events" ? (
+          <MatchEventsTab matchRef={id} />
+        ) : (
+          <EmptyState text={activeTab.empty} />
+        )}
       </section>
     </main>
   );
