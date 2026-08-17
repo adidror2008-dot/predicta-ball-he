@@ -56,7 +56,7 @@ export function MatchCard({ match }: { match: MatchCardData }) {
       <div className="mt-3 flex items-center gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <LogoSlot logoUrl={match.homeLogo ?? null} name={match.homeName} />
-          <span className="min-w-0 flex-1 truncate whitespace-nowrap text-sm font-medium">{match.homeName}</span>
+          <span dir="auto" className="min-w-0 flex-1 truncate whitespace-nowrap text-sm font-medium">{match.homeName}</span>
         </div>
 
         <div className="w-14 shrink-0 text-center">
@@ -74,7 +74,7 @@ export function MatchCard({ match }: { match: MatchCardData }) {
         </div>
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-          <span className="min-w-0 flex-1 truncate whitespace-nowrap text-end text-sm font-medium">{match.awayName}</span>
+          <span dir="auto" className="min-w-0 flex-1 truncate whitespace-nowrap text-end text-sm font-medium">{match.awayName}</span>
           <LogoSlot logoUrl={match.awayLogo ?? null} name={match.awayName} />
         </div>
       </div>
