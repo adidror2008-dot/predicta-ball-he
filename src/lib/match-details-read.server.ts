@@ -176,12 +176,25 @@ export async function getMatchLineups(
     for (const p of players ?? []) nameById.set(p.id, p.name_en ?? p.name_he ?? null);
   }
 
+  const ratingById = new Map<string, number | null>();
+  if (playerIds.length > 0) {
+    const { data: ratings } = await supabaseAdmin
+      .from("player_ratings")
+      .select("player_id, rating")
+      .eq("match_id", match.id)
+      .in("player_id", playerIds);
+    for (const r of ratings ?? []) {
+      if (r.player_id) ratingById.set(r.player_id, r.rating === null ? null : Number(r.rating));
+    }
+  }
+
   const toPlayer = (r: (typeof rows)[number]): LineupPlayer => ({
     player_id: r.player_id,
     name: r.player_id ? (nameById.get(r.player_id) ?? null) : null,
     position: r.position,
     shirt_number: r.shirt_number,
     is_starting: r.is_starting,
+    rating: r.player_id ? (ratingById.get(r.player_id) ?? null) : null,
   });
 
   const bySide = (teamId: string | null) =>
