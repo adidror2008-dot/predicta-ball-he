@@ -9,6 +9,7 @@ export type IncidentRow = {
   minute: number | null;
   added_minute: number | null;
   team_id: string | null;
+  side: "home" | "away" | null;
   player_id: string | null;
   player_name: string | null;
   related_player_name: string | null;
