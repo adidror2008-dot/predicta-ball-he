@@ -101,7 +101,7 @@ export async function runTick(): Promise<TickResult> {
   // ---- STEP 1: pure database
   const { data: activeMatches, error: activeError } = await supabaseAdmin
     .from("matches")
-    .select("id, external_id, competition_id, kickoff_at, status, needs_review")
+    .select("id, external_id, competition_id, kickoff_at, status, needs_review, live_source")
     .eq("source", SOURCE)
     .not("external_id", "is", null)
     .not("kickoff_at", "is", null)
