@@ -1,5 +1,9 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
+const LOGO_BUCKET = "team-logos";
+const LOGO_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7;
+
+
 export type MatchListItem = {
   id: string;
   externalId: string | null;
