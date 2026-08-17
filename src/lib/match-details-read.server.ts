@@ -34,11 +34,20 @@ export type MatchLineupsResult = {
   awayFormation: string | null;
 };
 
-async function resolveMatch(matchExternalId: string) {
-  const { data, error } = await supabaseAdmin
-    .from("matches")
-    .select("id, home_team_id, away_team_id")
-    .eq("external_id", matchExternalId)
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Accepts either the internal matches.id (uuid) or the provider external_id.
+async function resolveMatch(matchRef: string) {
+  const base = () => supabaseAdmin.from("matches").select("id, home_team_id, away_team_id");
+
+  if (UUID_RE.test(matchRef)) {
+    const { data, error } = await base().eq("id", matchRef).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (data) return data;
+  }
+
+  const { data, error } = await base()
+    .eq("external_id", matchRef)
     .eq("source", SOURCE)
     .maybeSingle();
   if (error) throw new Error(error.message);
