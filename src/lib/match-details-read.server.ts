@@ -50,6 +50,7 @@ export type LineupPlayer = {
   position: string | null;
   shirt_number: number | null;
   is_starting: boolean | null;
+  rating: number | null;
 };
 
 export type MatchLineupsResult = {
