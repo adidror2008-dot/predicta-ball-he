@@ -11,6 +11,11 @@ const ACTIVE_WINDOW_AFTER_MS = 10 * 60 * 1000;
 const STALE_AFTER_MS = 100 * 60 * 1000;
 const NEEDS_REVIEW_AFTER_MS = 24 * 60 * 60 * 1000;
 const MAX_SETTLE_COMPETITIONS = 3;
+/** Lineups are usually published about an hour before kickoff. */
+const LINEUP_WINDOW_MIN_MS = 55 * 60 * 1000;
+const LINEUP_WINDOW_MAX_MS = 65 * 60 * 1000;
+const MAX_LINEUP_FETCHES = 4;
+const MAX_FINAL_FETCHES = 4;
 
 export type TickResult = {
   status: "success" | "partial" | "failed";
