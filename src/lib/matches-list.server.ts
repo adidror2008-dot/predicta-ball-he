@@ -55,6 +55,31 @@ export async function getMatchesList(): Promise<MatchListItem[]> {
     (compsRes.data ?? []).map((c) => [c.id, (c.name_he || c.name_en) ?? ""]),
   );
 
+  // The `team-logos` bucket is private: logo_url holds a storage path, so it is
+  // signed at read time only. Rows already holding a full URL pass through.
+  const logoPaths = Array.from(
+    new Set(
+      (teamsRes.data ?? [])
+        .map((t) => t.logo_url)
+        .filter((u): u is string => !!u && !/^https?:\/\//i.test(u)),
+    ),
+  );
+  const signedByPath = new Map<string, string>();
+  if (logoPaths.length > 0) {
+    const { data: signed } = await supabaseAdmin.storage
+      .from(LOGO_BUCKET)
+      .createSignedUrls(logoPaths, LOGO_SIGNED_URL_TTL_SECONDS);
+    for (const s of signed ?? []) {
+      if (s.signedUrl && s.path) signedByPath.set(s.path, s.signedUrl);
+    }
+  }
+  const logoUrl = (raw: string | null | undefined): string | null => {
+    if (!raw) return null;
+    if (/^https?:\/\//i.test(raw)) return raw;
+    return signedByPath.get(raw) ?? null;
+  };
+
+
   const items: MatchListItem[] = [];
   for (const m of matches) {
     const home = m.home_team_id ? teamById.get(m.home_team_id) : undefined;
