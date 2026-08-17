@@ -8,12 +8,15 @@ export type MatchCardData = {
   id: string;
   homeName: string;
   awayName: string;
+  homeLogo?: string | null;
+  awayLogo?: string | null;
   homeScore: number | null;
   awayScore: number | null;
   kickoffTime: string | null;
   date: string | null;
   status: MatchStatus;
 };
+
 
 const statusLabel: Record<MatchStatus, string> = {
   scheduled: "טרם החל",
@@ -52,7 +55,7 @@ export function MatchCard({ match }: { match: MatchCardData }) {
 
       <div className="mt-3 flex items-center gap-3">
         <div className="flex flex-1 items-center gap-2">
-          <LogoSlot />
+          <LogoSlot logoUrl={match.homeLogo ?? null} name={match.homeName} />
           <span className="truncate text-sm font-medium">{match.homeName}</span>
         </div>
 
@@ -72,7 +75,7 @@ export function MatchCard({ match }: { match: MatchCardData }) {
 
         <div className="flex flex-1 items-center justify-end gap-2">
           <span className="truncate text-sm font-medium">{match.awayName}</span>
-          <LogoSlot />
+          <LogoSlot logoUrl={match.awayLogo ?? null} name={match.awayName} />
         </div>
       </div>
     </Link>
