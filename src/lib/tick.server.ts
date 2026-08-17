@@ -300,6 +300,38 @@ export async function runTick(): Promise<TickResult> {
     }
   }
 
+  // ---- STEP 3b: matches that were live on an earlier tick but dropped out of the feed
+  const droppedFromLive = active
+    .filter(
+      (m) =>
+        !seenLive.has(String(m.external_id)) &&
+        m.live_source === SOURCE &&
+        !FINAL_STATUS_TYPES.includes(String(m.status)),
+    )
+    .slice(0, MAX_FINAL_FETCHES);
+
+  for (const m of droppedFromLive) {
+    if (!(await takeBudget())) {
+      budgetBlocked = true;
+      break;
+    }
+    const res = await call(`/api/v1/event/${m.external_id}`);
+    finalsFetched += 1;
+    const ev = res.json?.["event"] as Record<string, any> | undefined;
+    if (!res.ok || !ev) continue;
+    const { error } = await supabaseAdmin
+      .from("matches")
+      .update({
+        status: ev["status"]?.["type"] ?? m.status,
+        home_score: ev["homeScore"]?.["current"] ?? null,
+        away_score: ev["awayScore"]?.["current"] ?? null,
+        minute: null,
+        fetched_at: new Date().toISOString(),
+      })
+      .eq("id", m.id);
+    if (!error) matchesSettled += 1;
+  }
+
   const detail = {
     api_calls_made: apiCalls,
     active_matches: active.length,
@@ -308,20 +340,13 @@ export async function runTick(): Promise<TickResult> {
     competitions_settled: competitionsSettled,
     matches_settled: matchesSettled,
     needs_review_flagged: needsReviewFlagged,
+    lineups_prefetched: lineupsPrefetched,
+    finals_fetched: finalsFetched,
     budget_blocked: budgetBlocked,
   };
   const status = budgetBlocked ? "partial" : "success";
   await finish(status, detail);
 
-  return {
-    status,
-    api_calls_made: apiCalls,
-    active_matches: active.length,
-    live_matches_updated: liveUpdated,
-    stale_matches: staleCount,
-    competitions_settled: competitionsSettled,
-    matches_settled: matchesSettled,
-    needs_review_flagged: needsReviewFlagged,
-    ...(budgetBlocked ? { reason: "budget_blocked" } : {}),
-  };
+  return baseResult(status, active.length, budgetBlocked ? "budget_blocked" : undefined);
 }
+
