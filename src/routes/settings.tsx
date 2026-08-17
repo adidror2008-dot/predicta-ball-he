@@ -107,7 +107,7 @@ function SettingsScreen() {
         <SectionTitle>אודות</SectionTitle>
         <div className="rounded-2xl bg-card p-4 shadow-card">
           <img
-            src="/predictaball_logo.svg"
+            src="/predictaball-logo-source.jpg"
             alt="PredictaBall"
             className="no-mirror w-full rounded-2xl"
           />
