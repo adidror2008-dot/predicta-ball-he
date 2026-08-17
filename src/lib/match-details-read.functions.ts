@@ -20,3 +20,17 @@ export const getPlayerPhotoFn = createServerFn({ method: "POST" })
     const { getPlayerPhoto } = await import("@/lib/match-details-read.server");
     return { url: await getPlayerPhoto(data.playerExternalId) };
   });
+
+export const getMatchHeaderFn = createServerFn({ method: "POST" })
+  .inputValidator((input: { matchExternalId: string }) => input)
+  .handler(async ({ data }) => {
+    const { getMatchHeader } = await import("@/lib/match-details-read.server");
+    return getMatchHeader(data.matchExternalId);
+  });
+
+export const getMatchPredictionFn = createServerFn({ method: "POST" })
+  .inputValidator((input: { matchExternalId: string }) => input)
+  .handler(async ({ data }) => {
+    const { getMatchPrediction } = await import("@/lib/match-details-read.server");
+    return getMatchPrediction(data.matchExternalId);
+  });

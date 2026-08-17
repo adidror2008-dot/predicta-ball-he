@@ -236,3 +236,93 @@ export async function getPlayerPhoto(playerExternalId: string): Promise<string |
   if (signError || !signed?.signedUrl) return null;
   return signed.signedUrl;
 }
+
+async function signLogo(raw: string | null | undefined): Promise<string | null> {
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const { data } = await supabaseAdmin.storage
+    .from(LOGO_BUCKET)
+    .createSignedUrl(raw, SIGNED_URL_TTL_SECONDS);
+  return data?.signedUrl ?? null;
+}
+
+export async function getMatchHeader(matchRef: string): Promise<MatchHeader | null> {
+  const base = () =>
+    supabaseAdmin
+      .from("matches")
+      .select(
+        "id, external_id, status, kickoff_at, venue, home_team_id, away_team_id, home_score, away_score",
+      );
+
+  let row: Awaited<ReturnType<typeof base>>["data"] extends (infer T)[] | null ? T | null : never =
+    null;
+
+  if (UUID_RE.test(matchRef)) {
+    const { data } = await base().eq("id", matchRef).maybeSingle();
+    row = data;
+  }
+  if (!row) {
+    const { data } = await base().eq("external_id", matchRef).eq("source", SOURCE).maybeSingle();
+    row = data;
+  }
+  if (!row) return null;
+
+  const teamIds = [row.home_team_id, row.away_team_id].filter((v): v is string => !!v);
+  const { data: teams } = teamIds.length
+    ? await supabaseAdmin.from("teams").select("id, name_he, name_en, logo_url").in("id", teamIds)
+    : { data: [] };
+
+  const byId = new Map((teams ?? []).map((t) => [t.id, t]));
+  const home = row.home_team_id ? byId.get(row.home_team_id) : undefined;
+  const away = row.away_team_id ? byId.get(row.away_team_id) : undefined;
+
+  const [homeLogo, awayLogo] = await Promise.all([
+    signLogo(home?.logo_url),
+    signLogo(away?.logo_url),
+  ]);
+
+  return {
+    id: row.id,
+    externalId: row.external_id,
+    status: row.status,
+    isFinished: row.status === "finished",
+    kickoffAt: row.kickoff_at,
+    venue: row.venue,
+    homeName: home?.name_he || home?.name_en || null,
+    awayName: away?.name_he || away?.name_en || null,
+    homeLogo,
+    awayLogo,
+    homeScore: row.home_score,
+    awayScore: row.away_score,
+  };
+}
+
+export async function getMatchPrediction(matchRef: string): Promise<MatchPrediction | null> {
+  const match = await resolveMatch(matchRef);
+  if (!match) return null;
+
+  const { data } = await supabaseAdmin
+    .from("predictions")
+    .select(
+      "predicted_home_score, predicted_away_score, prob_home, prob_draw, prob_away, confidence, reasons_he",
+    )
+    .eq("match_id", match.id)
+    .maybeSingle();
+  if (!data) return null;
+
+  const reasons = Array.isArray(data.reasons_he)
+    ? (data.reasons_he as unknown[]).filter((r): r is string => typeof r === "string")
+    : [];
+
+  const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+
+  return {
+    predictedHomeScore: data.predicted_home_score,
+    predictedAwayScore: data.predicted_away_score,
+    probHome: num(data.prob_home),
+    probDraw: num(data.prob_draw),
+    probAway: num(data.prob_away),
+    confidence: num(data.confidence),
+    reasons,
+  };
+}
