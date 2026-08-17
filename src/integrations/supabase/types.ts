@@ -438,6 +438,8 @@ export type Database = {
       }
       matches: {
         Row: {
+          aggregate_away: number | null
+          aggregate_home: number | null
           away_score: number | null
           away_team_id: string | null
           competition_id: string | null
@@ -448,19 +450,27 @@ export type Database = {
           home_team_id: string | null
           id: string
           is_neutral: boolean
+          is_qualifier: boolean
           kickoff_at: string | null
+          leg: number | null
           live_source: string | null
           minute: number | null
           needs_review: boolean | null
           round: string | null
+          round_name: string | null
+          round_number: number | null
           season: string | null
           source: string | null
+          stage: string | null
           status: string | null
+          tie_key: string | null
           time_confirmed: boolean
           updated_at: string
           venue: string | null
         }
         Insert: {
+          aggregate_away?: number | null
+          aggregate_home?: number | null
           away_score?: number | null
           away_team_id?: string | null
           competition_id?: string | null
@@ -471,19 +481,27 @@ export type Database = {
           home_team_id?: string | null
           id?: string
           is_neutral?: boolean
+          is_qualifier?: boolean
           kickoff_at?: string | null
+          leg?: number | null
           live_source?: string | null
           minute?: number | null
           needs_review?: boolean | null
           round?: string | null
+          round_name?: string | null
+          round_number?: number | null
           season?: string | null
           source?: string | null
+          stage?: string | null
           status?: string | null
+          tie_key?: string | null
           time_confirmed?: boolean
           updated_at?: string
           venue?: string | null
         }
         Update: {
+          aggregate_away?: number | null
+          aggregate_home?: number | null
           away_score?: number | null
           away_team_id?: string | null
           competition_id?: string | null
@@ -494,14 +512,20 @@ export type Database = {
           home_team_id?: string | null
           id?: string
           is_neutral?: boolean
+          is_qualifier?: boolean
           kickoff_at?: string | null
+          leg?: number | null
           live_source?: string | null
           minute?: number | null
           needs_review?: boolean | null
           round?: string | null
+          round_name?: string | null
+          round_number?: number | null
           season?: string | null
           source?: string | null
+          stage?: string | null
           status?: string | null
+          tie_key?: string | null
           time_confirmed?: boolean
           updated_at?: string
           venue?: string | null

@@ -14,6 +14,7 @@ import { Route as NewsRouteImport } from './routes/news'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as MatchIdRouteImport } from './routes/match.$id'
 import { Route as ApiPublicDiscoverSeasonsRouteImport } from './routes/api/public/discover-seasons'
+import { Route as ApiPublicVerifyEndpointsRouteImport } from './routes/api/public/verify-endpoints'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -41,6 +42,12 @@ const ApiPublicDiscoverSeasonsRoute =
     path: '/api/public/discover-seasons',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicVerifyEndpointsRoute =
+  ApiPublicVerifyEndpointsRouteImport.update({
+    id: '/api/public/verify-endpoints',
+    path: '/api/public/verify-endpoints',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -48,6 +55,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/match/$id': typeof MatchIdRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
+  '/api/public/verify-endpoints': typeof ApiPublicVerifyEndpointsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -55,6 +63,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/match/$id': typeof MatchIdRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
+  '/api/public/verify-endpoints': typeof ApiPublicVerifyEndpointsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -63,14 +72,25 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/match/$id': typeof MatchIdRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
+  '/api/public/verify-endpoints': typeof ApiPublicVerifyEndpointsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/news' | '/settings' | '/match/$id' | '/api/public/discover-seasons'
+    | '/'
+    | '/news'
+    | '/settings'
+    | '/match/$id'
+    | '/api/public/discover-seasons'
+    | '/api/public/verify-endpoints'
   fileRoutesByTo: FileRoutesByTo
   to:
-    '/' | '/news' | '/settings' | '/match/$id' | '/api/public/discover-seasons'
+    | '/'
+    | '/news'
+    | '/settings'
+    | '/match/$id'
+    | '/api/public/discover-seasons'
+    | '/api/public/verify-endpoints'
   id:
     | '__root__'
     | '/'
@@ -78,6 +98,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/match/$id'
     | '/api/public/discover-seasons'
+    | '/api/public/verify-endpoints'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -86,6 +107,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   MatchIdRoute: typeof MatchIdRoute
   ApiPublicDiscoverSeasonsRoute: typeof ApiPublicDiscoverSeasonsRoute
+  ApiPublicVerifyEndpointsRoute: typeof ApiPublicVerifyEndpointsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -125,6 +147,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicDiscoverSeasonsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/verify-endpoints': {
+      id: '/api/public/verify-endpoints'
+      path: '/api/public/verify-endpoints'
+      fullPath: '/api/public/verify-endpoints'
+      preLoaderRoute: typeof ApiPublicVerifyEndpointsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -134,6 +163,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   MatchIdRoute: MatchIdRoute,
   ApiPublicDiscoverSeasonsRoute: ApiPublicDiscoverSeasonsRoute,
+  ApiPublicVerifyEndpointsRoute: ApiPublicVerifyEndpointsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
