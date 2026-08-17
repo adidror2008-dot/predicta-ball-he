@@ -39,7 +39,7 @@ function groupRows(players: LineupPlayer[]) {
   const order = ["G", "D", "M", "F"];
   return order.map((code) => ({
     code,
-    depth: ROW_DEPTH[code],
+    depth: ROW_DEPTH[code] ?? 46,
     players: players.filter((p) => (p.position ?? "M").toUpperCase() === code),
   }));
 }
