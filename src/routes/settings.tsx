@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { X } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { EmptyState, SectionTitle } from "@/components/predictaball/ui-bits";
 import { cn } from "@/lib/utils";
@@ -104,7 +104,19 @@ function SettingsScreen() {
       </section>
 
       <section>
+        <SectionTitle>המודל</SectionTitle>
+        <Link
+          to="/accuracy"
+          className="flex items-center justify-between rounded-2xl bg-card p-4 shadow-card"
+        >
+          <span className="text-sm font-medium">דיוק המודל</span>
+          <ChevronLeft className="size-4 text-muted-foreground" aria-hidden />
+        </Link>
+      </section>
+
+      <section>
         <SectionTitle>אודות</SectionTitle>
+
         <div className="rounded-2xl bg-card p-4 shadow-card">
           <img
             src="/predictaball-logo-source.jpg"
