@@ -314,15 +314,27 @@ export async function getMatchPrediction(matchRef: string): Promise<MatchPredict
   const { data } = await supabaseAdmin
     .from("predictions")
     .select(
-      "predicted_home_score, predicted_away_score, prob_home, prob_draw, prob_away, confidence, reason_lines_he",
+      "predicted_home_score, predicted_away_score, prob_home, prob_draw, prob_away, prob_goals_0_1, prob_goals_2_3, prob_goals_4_plus, confidence, confidence_band, factors, reason_lines_he, computed_at, next_update_at",
     )
     .eq("match_id", match.id)
+    .eq("model_version", MODEL_VERSION)
     .maybeSingle();
   if (!data) return null;
 
   const reasons = Array.isArray(data.reason_lines_he)
     ? (data.reason_lines_he as unknown[]).filter((r): r is string => typeof r === "string")
     : [];
+
+  const rawFactors = Array.isArray(data.factors) ? (data.factors as unknown[]) : [];
+  const factors: PredictionFactor[] = rawFactors.flatMap((f) => {
+    if (!f || typeof f !== "object") return [];
+    const o = f as Record<string, unknown>;
+    const type = typeof o["type"] === "string" ? (o["type"] as string) : null;
+    if (!type) return [];
+    const side = o["side"] === "home" || o["side"] === "away" ? (o["side"] as "home" | "away") : null;
+    const value = o["value"] === null || o["value"] === undefined ? null : Number(o["value"]);
+    return [{ type, side, value }];
+  });
 
   const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 
@@ -332,7 +344,63 @@ export async function getMatchPrediction(matchRef: string): Promise<MatchPredict
     probHome: num(data.prob_home),
     probDraw: num(data.prob_draw),
     probAway: num(data.prob_away),
+    probGoals01: num(data.prob_goals_0_1),
+    probGoals23: num(data.prob_goals_2_3),
+    probGoals4Plus: num(data.prob_goals_4_plus),
     confidence: num(data.confidence),
+    confidenceBand: data.confidence_band ?? null,
+    factors,
     reasons,
+    computedAt: data.computed_at ?? null,
+    nextUpdateAt: data.next_update_at ?? null,
   };
 }
+
+export type ModelAccuracy = {
+  n: number;
+  pctWinner: number | null;
+  pctExact: number | null;
+  pctGoalBucket: number | null;
+  pctOu25: number | null;
+  pctGoalsWithin1: number | null;
+  avgRps: number | null;
+  avgBrier: number | null;
+  naivePctWinner: number | null;
+  naivePctBucket: number | null;
+  minSample: number;
+};
+
+export async function getModelAccuracy(): Promise<ModelAccuracy | null> {
+  const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+
+  const { data: cfg } = await supabaseAdmin
+    .from("model_config")
+    .select("value")
+    .eq("key", "accuracy_min_sample")
+    .maybeSingle();
+  const minSample = cfg?.value === null || cfg?.value === undefined ? 30 : Number(cfg.value);
+
+  const { data, error } = await supabaseAdmin
+    .from("model_accuracy_summary" as never)
+    .select("*")
+    .eq("model_version", MODEL_VERSION)
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+
+  const row = data as Record<string, unknown>;
+  return {
+    n: Number(row["n"] ?? 0),
+    pctWinner: num(row["pct_winner"]),
+    pctExact: num(row["pct_exact"]),
+    pctGoalBucket: num(row["pct_goal_bucket"]),
+    pctOu25: num(row["pct_ou25"]),
+    pctGoalsWithin1: num(row["pct_goals_within_1"]),
+    avgRps: num(row["avg_rps"]),
+    avgBrier: num(row["avg_brier"]),
+    naivePctWinner: num(row["naive_pct_winner"]),
+    naivePctBucket: num(row["naive_pct_bucket"]),
+    minSample,
+  };
+}
+
