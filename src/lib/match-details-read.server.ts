@@ -20,15 +20,29 @@ export type MatchHeader = {
   awayScore: number | null;
 };
 
+export type PredictionFactor = {
+  type: string;
+  side: "home" | "away" | null;
+  value: number | null;
+};
+
 export type MatchPrediction = {
   predictedHomeScore: number | null;
   predictedAwayScore: number | null;
   probHome: number | null;
   probDraw: number | null;
   probAway: number | null;
+  probGoals01: number | null;
+  probGoals23: number | null;
+  probGoals4Plus: number | null;
   confidence: number | null;
+  confidenceBand: string | null;
+  factors: PredictionFactor[];
   reasons: string[];
+  computedAt: string | null;
+  nextUpdateAt: string | null;
 };
+
 
 export type IncidentRow = {
   type: string | null;
