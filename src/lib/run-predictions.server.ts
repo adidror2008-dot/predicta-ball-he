@@ -133,15 +133,20 @@ export async function runPredictions(): Promise<RunPredictionsSummary> {
     new Set(usable.flatMap((m) => [m.home_team_id as string, m.away_team_id as string])),
   );
 
-  // (ג)+(ד) one history + Elo load per team, kept in memory
-  const { data: teamRows, error: teamsError } = await supabase
-    .from("teams")
-    .select("id, elo_internal")
-    .in("id", teamIds);
-  if (teamsError) throw new Error(`teams read failed: ${teamsError.message}`);
-  const eloById = new Map<string, number | null>(
-    (teamRows ?? []).map((t) => [t.id, t.elo_internal === null ? null : Number(t.elo_internal)]),
-  );
+  // (ג)+(ד) one history + Elo load per team, kept in memory.
+  // Chunked so neither the URL length nor the 1000-row response cap truncates it.
+  const eloById = new Map<string, number | null>();
+  const ID_CHUNK = 500;
+  for (let i = 0; i < teamIds.length; i += ID_CHUNK) {
+    const { data: teamRows, error: teamsError } = await supabase
+      .from("teams")
+      .select("id, elo_internal")
+      .in("id", teamIds.slice(i, i + ID_CHUNK));
+    if (teamsError) throw new Error(`teams read failed: ${teamsError.message}`);
+    for (const t of teamRows ?? []) {
+      eloById.set(t.id, t.elo_internal === null ? null : Number(t.elo_internal));
+    }
+  }
 
   const teamData = new Map<string, TeamData>();
   await mapLimit(teamIds, CONCURRENCY, async (teamId) => {
