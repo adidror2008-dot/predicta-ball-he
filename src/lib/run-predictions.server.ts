@@ -102,17 +102,30 @@ export async function runPredictions(): Promise<RunPredictionsSummary> {
     ? cfg.historyMaxMatches
     : HISTORY_FALLBACK_LIMIT;
 
-  // (ב) candidate matches
+  // (ב) candidate matches — paginated, PostgREST caps a single response at 1000 rows
   const nowIso = new Date().toISOString();
-  const { data: matches, error: matchesError } = await supabase
-    .from("matches")
-    .select("id, competition_id, home_team_id, away_team_id, kickoff_at")
-    .eq("status", "notstarted")
-    .gt("kickoff_at", nowIso)
-    .order("kickoff_at", { ascending: true });
-  if (matchesError) throw new Error(`matches read failed: ${matchesError.message}`);
+  const matches: Array<{
+    id: string;
+    competition_id: string | null;
+    home_team_id: string | null;
+    away_team_id: string | null;
+    kickoff_at: string | null;
+  }> = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("matches")
+      .select("id, competition_id, home_team_id, away_team_id, kickoff_at")
+      .eq("status", "notstarted")
+      .gt("kickoff_at", nowIso)
+      .order("kickoff_at", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`matches read failed: ${error.message}`);
+    matches.push(...(data ?? []));
+    if (!data || data.length < PAGE) break;
+  }
 
-  const usable = (matches ?? []).filter(
+  const usable = matches.filter(
     (m) => m.home_team_id && m.away_team_id && m.kickoff_at,
   );
 
