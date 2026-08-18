@@ -509,7 +509,7 @@ export function predictMatch(input: PredictionInput): PredictionResult {
     homeStats: homeDiag,
     awayStats: awayDiag,
     eloDiff,
-    h2h,
+    ...(h2h ? { h2h } : {}),
   });
 
   return {
