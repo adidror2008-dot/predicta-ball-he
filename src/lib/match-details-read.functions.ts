@@ -34,3 +34,8 @@ export const getMatchPredictionFn = createServerFn({ method: "POST" })
     const { getMatchPrediction } = await import("@/lib/match-details-read.server");
     return getMatchPrediction(data.matchExternalId);
   });
+
+export const getModelAccuracyFn = createServerFn({ method: "POST" }).handler(async () => {
+  const { getModelAccuracy } = await import("@/lib/match-details-read.server");
+  return getModelAccuracy();
+});
