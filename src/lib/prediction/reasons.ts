@@ -1,106 +1,47 @@
 /**
- * Turns engine factors into short Hebrew lines.
- *
- * This is the DETERMINISTIC fallback and the source of truth for what may be said.
- * The AI phrasing layer is allowed to reword these lines only. It may never add a
- * reason, drop a number, or reorder by anything other than the engine's impact score.
- *
- * Rules enforced here:
- *   - at most 3 lines
- *   - every line contains a real number that came from the engine
- *   - no line may claim anything the factor data does not contain
+ * Deterministic Hebrew phrasing for engine factors.
+ * No AI, no randomness. One line per factor, every line carries a number.
+ * LTR wrapping of the numbers is the UI's job — here they are plain strings.
  */
 
-import type { PredictionFactor } from './types';
+import type { Factor } from './types';
 
-/** Wraps a number so it renders left-to-right inside Hebrew RTL text. */
-function ltr(value: number | string): string {
-  return `\u200E${value}\u200E`;
+function num(value: number | string | undefined): string {
+  return value === undefined ? '' : String(value);
 }
 
-export function factorToHebrew(factor: PredictionFactor): string {
-  const v = factor.values as Record<string, number | string> & {
-    strongerTeam: string;
-    gap: number;
-    betterTeam: string;
-    homePoints: number;
-    awayPoints: number;
-    team: string;
-    goalsPerMatch: number;
-    concededPerMatch: number;
-    competition: string;
-    factor: number;
-    homeRestDays: number;
-    awayRestDays: number;
-    homeWins: number;
-    awayWins: number;
-    meetings: number;
-    homeMatches: number;
-    awayMatches: number;
-  };
+export function factorToHebrew(factor: Factor): string {
+  const v = factor.values;
 
-  switch (factor.type) {
+  switch (factor.key) {
     case 'elo_gap':
-      return `${v.strongerTeam} חזקה יותר בדירוג — פער של ${ltr(v.gap as number)} נקודות`;
+      return `${num(v['strongerTeam'])} חזקה יותר בדירוג — פער של ${num(v['gap'])} נקודות`;
 
     case 'form':
-      return `${v.betterTeam} בכושר טוב יותר — ${ltr(
-        factor.side === 'home' ? (v.homePoints as number) : (v.awayPoints as number),
-      )} נקודות מ-${ltr(3)} האחרונים מול ${ltr(
-        factor.side === 'home' ? (v.awayPoints as number) : (v.homePoints as number),
-      )}`;
+      return `${num(v['teamA'])} אספה ${num(v['pointsA'])} נקודות מ-3 האחרונים מול ${num(
+        v['pointsB'],
+      )} של ${num(v['teamB'])}`;
 
-    case 'attack':
-      return `${v.team} כובשת ${ltr(v.goalsPerMatch as number)} גולים למשחק בממוצע`;
-
-    case 'defence':
-      return `${v.team} מקבלת רק ${ltr(v.concededPerMatch as number)} גולים למשחק`;
+    case 'attack_defence':
+      return `תוחלת גולים: ${num(v['lambdaHome'])} למארחת מול ${num(v['lambdaAway'])} לאורחת`;
 
     case 'home_advantage':
-      return `יתרון בית משמעותי ב${v.competition} — מקדם ${ltr(v.factor as number)}`;
+      return `יתרון בית ב${num(v['competition'])} — מקדם ${num(v['factor'])}`;
 
-    case 'rest': {
-      const homeRest = v.homeRestDays as number;
-      const awayRest = v.awayRestDays as number;
-      const fresher = factor.side === 'home' ? homeRest : awayRest;
-      const tired = factor.side === 'home' ? awayRest : homeRest;
-      return `פער מנוחה — ${ltr(fresher)} ימים מול ${ltr(tired)} ימים ליריבה`;
-    }
+    case 'rest':
+      return `ל${num(v['team'])} ${num(v['restLow'])} ימי מנוחה בלבד מול ${num(v['restHigh'])}`;
 
-    case 'h2h':
-      return `במפגשים הקודמים: ${ltr(v.homeWins as number)}-${ltr(
-        v.awayWins as number,
-      )} מתוך ${ltr(v.meetings as number)} משחקים`;
+    case 'estimated_history':
+      return `חלק מההיסטוריה מול יריבים שרמתם לא ידועה`;
 
-    case 'thin_data':
-      return `בסיס נתונים דק — ${ltr(v.homeMatches as number)} ו-${ltr(
-        v.awayMatches as number,
-      )} משחקים בלבד. הביטחון בתחזית נמוך בהתאם`;
+    case 'low_sample':
+      return `מבוסס על ${num(v['matches'])} משחקים בלבד`;
 
     default:
       return '';
   }
 }
 
-export function factorsToHebrewLines(factors: PredictionFactor[]): string[] {
-  return factors.map(factorToHebrew).filter((line) => line.length > 0).slice(0, 3);
-}
-
-/**
- * The prompt handed to the AI phrasing layer.
- * Deliberately closed: the model receives ONLY these lines and may only reword them.
- */
-export function buildPhrasingPrompt(lines: string[]): string {
-  return [
-    'נסח מחדש את השורות הבאות בעברית טבעית וקצרה.',
-    'חוקים מוחלטים:',
-    '1. אסור להוסיף מידע, סיבה או מספר שלא מופיע כאן.',
-    '2. אסור להשמיט אף מספר.',
-    '3. כל שורה עד 12 מילים.',
-    '4. שמור על אותו סדר השורות.',
-    '5. החזר JSON בלבד: {"lines": ["...", "..."]}',
-    '',
-    'השורות:',
-    ...lines.map((line, i) => `${i + 1}. ${line}`),
-  ].join('\n');
+export function factorsToHebrew(factors: Factor[]): string[] {
+  return factors.map(factorToHebrew).filter((line) => line.length > 0);
 }
