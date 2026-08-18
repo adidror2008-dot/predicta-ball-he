@@ -299,10 +299,10 @@ export function predict(input: EngineInput, config: EngineConfig): EngineResult 
       else if (i === j) pDraw += p;
       else pAway += p;
 
-      if (totalGoals >= LAMBDA_FACTOR_SCALE) pOver += p;
+      if (totalGoals >= 3) pOver += p;
       if (i >= 1 && j >= 1) pBtts += p;
       if (totalGoals <= 1) p01 += p;
-      else if (totalGoals <= LAMBDA_FACTOR_SCALE) p23 += p;
+      else if (totalGoals <= 3) p23 += p;
       else p4 += p;
 
       const better =
