@@ -159,6 +159,9 @@ export type Database = {
       }
       competitions: {
         Row: {
+          avg_goals_away: number | null
+          avg_goals_home: number | null
+          avg_goals_measured: boolean
           country: string | null
           created_at: string
           current_season_confirmed: boolean
@@ -167,18 +170,24 @@ export type Database = {
           external_id: string | null
           fetched_at: string | null
           home_advantage: number | null
+          home_advantage_measured: boolean
           id: string
           is_active: boolean | null
           logo_url: string | null
           name_en: string | null
           name_he: string
+          ref_elo: number | null
           season_calc_method: string
+          season_method: string
           sort_order: number | null
           source: string | null
           tournament_id: string | null
           updated_at: string
         }
         Insert: {
+          avg_goals_away?: number | null
+          avg_goals_home?: number | null
+          avg_goals_measured?: boolean
           country?: string | null
           created_at?: string
           current_season_confirmed?: boolean
@@ -187,18 +196,24 @@ export type Database = {
           external_id?: string | null
           fetched_at?: string | null
           home_advantage?: number | null
+          home_advantage_measured?: boolean
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
           name_en?: string | null
           name_he: string
+          ref_elo?: number | null
           season_calc_method: string
+          season_method?: string
           sort_order?: number | null
           source?: string | null
           tournament_id?: string | null
           updated_at?: string
         }
         Update: {
+          avg_goals_away?: number | null
+          avg_goals_home?: number | null
+          avg_goals_measured?: boolean
           country?: string | null
           created_at?: string
           current_season_confirmed?: boolean
@@ -207,12 +222,15 @@ export type Database = {
           external_id?: string | null
           fetched_at?: string | null
           home_advantage?: number | null
+          home_advantage_measured?: boolean
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
           name_en?: string | null
           name_he?: string
+          ref_elo?: number | null
           season_calc_method?: string
+          season_method?: string
           sort_order?: number | null
           source?: string | null
           tournament_id?: string | null
@@ -581,6 +599,30 @@ export type Database = {
           },
         ]
       }
+      model_config: {
+        Row: {
+          key: string
+          note_he: string
+          updated_at: string
+          value: number | null
+          value_text: string | null
+        }
+        Insert: {
+          key: string
+          note_he: string
+          updated_at?: string
+          value?: number | null
+          value_text?: string | null
+        }
+        Update: {
+          key?: string
+          note_he?: string
+          updated_at?: string
+          value?: number | null
+          value_text?: string | null
+        }
+        Relationships: []
+      }
       news: {
         Row: {
           external_id: string | null
@@ -771,84 +813,204 @@ export type Database = {
           },
         ]
       }
-      predictions: {
+      prediction_outcomes: {
         Row: {
-          computed_at: string | null
-          confidence: number | null
-          created_at: string
-          engine_version: string
-          expected_total_goals: number | null
-          explanation_he: string | null
+          actual_away: number
+          actual_bucket: string
+          actual_home: number
+          brier: number
+          computed_at: string
+          confidence_band: string
+          finished_at: string
+          goals_abs_error: number
+          hit_exact: boolean
+          hit_goal_bucket: boolean
+          hit_ou25: boolean
+          hit_winner: boolean
           id: string
-          lambda_away: number | null
-          lambda_home: number | null
           match_id: string
-          next_update_at: string | null
-          predicted_away_score: number | null
-          predicted_home_score: number | null
-          prob_away: number | null
-          prob_btts: number | null
-          prob_draw: number | null
-          prob_home: number | null
-          prob_over_2_5: number | null
-          prob_under_2_5: number | null
-          reasons_he: Json | null
-          score_matrix: Json | null
-          updated_at: string
+          model_version: string
+          naive_hit_bucket: boolean
+          naive_hit_winner: boolean
+          pred_away: number
+          pred_bucket: string
+          pred_home: number
+          prediction_id: string | null
+          rps: number
         }
         Insert: {
-          computed_at?: string | null
-          confidence?: number | null
-          created_at?: string
-          engine_version?: string
-          expected_total_goals?: number | null
-          explanation_he?: string | null
+          actual_away: number
+          actual_bucket: string
+          actual_home: number
+          brier: number
+          computed_at?: string
+          confidence_band: string
+          finished_at: string
+          goals_abs_error: number
+          hit_exact: boolean
+          hit_goal_bucket: boolean
+          hit_ou25: boolean
+          hit_winner: boolean
           id?: string
-          lambda_away?: number | null
-          lambda_home?: number | null
           match_id: string
-          next_update_at?: string | null
-          predicted_away_score?: number | null
-          predicted_home_score?: number | null
-          prob_away?: number | null
-          prob_btts?: number | null
-          prob_draw?: number | null
-          prob_home?: number | null
-          prob_over_2_5?: number | null
-          prob_under_2_5?: number | null
-          reasons_he?: Json | null
-          score_matrix?: Json | null
-          updated_at?: string
+          model_version: string
+          naive_hit_bucket: boolean
+          naive_hit_winner: boolean
+          pred_away: number
+          pred_bucket: string
+          pred_home: number
+          prediction_id?: string | null
+          rps: number
         }
         Update: {
-          computed_at?: string | null
-          confidence?: number | null
-          created_at?: string
-          engine_version?: string
-          expected_total_goals?: number | null
-          explanation_he?: string | null
+          actual_away?: number
+          actual_bucket?: string
+          actual_home?: number
+          brier?: number
+          computed_at?: string
+          confidence_band?: string
+          finished_at?: string
+          goals_abs_error?: number
+          hit_exact?: boolean
+          hit_goal_bucket?: boolean
+          hit_ou25?: boolean
+          hit_winner?: boolean
           id?: string
-          lambda_away?: number | null
-          lambda_home?: number | null
           match_id?: string
+          model_version?: string
+          naive_hit_bucket?: boolean
+          naive_hit_winner?: boolean
+          pred_away?: number
+          pred_bucket?: string
+          pred_home?: number
+          prediction_id?: string | null
+          rps?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prediction_outcomes_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prediction_outcomes_prediction_id_fkey"
+            columns: ["prediction_id"]
+            isOneToOne: false
+            referencedRelation: "predictions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      predictions: {
+        Row: {
+          computed_at: string
+          confidence: number
+          confidence_band: string
+          estimated_share: number
+          expected_total_goals: number
+          factors: Json
+          history_matches_away: number
+          history_matches_home: number
+          id: string
+          lambda_away: number
+          lambda_home: number
+          locked_at: string | null
+          locked_payload: Json | null
+          match_id: string
+          model_version: string
+          n_eff_away: number
+          n_eff_home: number
+          next_update_at: string | null
+          predicted_away_score: number
+          predicted_goal_bucket: string
+          predicted_home_score: number
+          prob_away: number
+          prob_btts: number
+          prob_draw: number
+          prob_goals_0_1: number
+          prob_goals_2_3: number
+          prob_goals_4_plus: number
+          prob_home: number
+          prob_over_2_5: number
+          prob_under_2_5: number
+          reason_lines_he: string[]
+          reasons_source: string
+        }
+        Insert: {
+          computed_at?: string
+          confidence: number
+          confidence_band: string
+          estimated_share?: number
+          expected_total_goals: number
+          factors?: Json
+          history_matches_away: number
+          history_matches_home: number
+          id?: string
+          lambda_away: number
+          lambda_home: number
+          locked_at?: string | null
+          locked_payload?: Json | null
+          match_id: string
+          model_version: string
+          n_eff_away: number
+          n_eff_home: number
           next_update_at?: string | null
-          predicted_away_score?: number | null
-          predicted_home_score?: number | null
-          prob_away?: number | null
-          prob_btts?: number | null
-          prob_draw?: number | null
-          prob_home?: number | null
-          prob_over_2_5?: number | null
-          prob_under_2_5?: number | null
-          reasons_he?: Json | null
-          score_matrix?: Json | null
-          updated_at?: string
+          predicted_away_score: number
+          predicted_goal_bucket: string
+          predicted_home_score: number
+          prob_away: number
+          prob_btts: number
+          prob_draw: number
+          prob_goals_0_1: number
+          prob_goals_2_3: number
+          prob_goals_4_plus: number
+          prob_home: number
+          prob_over_2_5: number
+          prob_under_2_5: number
+          reason_lines_he?: string[]
+          reasons_source?: string
+        }
+        Update: {
+          computed_at?: string
+          confidence?: number
+          confidence_band?: string
+          estimated_share?: number
+          expected_total_goals?: number
+          factors?: Json
+          history_matches_away?: number
+          history_matches_home?: number
+          id?: string
+          lambda_away?: number
+          lambda_home?: number
+          locked_at?: string | null
+          locked_payload?: Json | null
+          match_id?: string
+          model_version?: string
+          n_eff_away?: number
+          n_eff_home?: number
+          next_update_at?: string | null
+          predicted_away_score?: number
+          predicted_goal_bucket?: string
+          predicted_home_score?: number
+          prob_away?: number
+          prob_btts?: number
+          prob_draw?: number
+          prob_goals_0_1?: number
+          prob_goals_2_3?: number
+          prob_goals_4_plus?: number
+          prob_home?: number
+          prob_over_2_5?: number
+          prob_under_2_5?: number
+          reason_lines_he?: string[]
+          reasons_source?: string
         }
         Relationships: [
           {
             foreignKeyName: "predictions_match_id_fkey"
             columns: ["match_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "matches"
             referencedColumns: ["id"]
           },
@@ -1099,13 +1261,77 @@ export type Database = {
         }
         Relationships: []
       }
+      team_match_history: {
+        Row: {
+          external_match_id: string
+          fetched_at: string
+          goals_against: number
+          goals_for: number
+          id: string
+          is_home: boolean
+          opponent_elo: number | null
+          opponent_external_id: string | null
+          opponent_name: string | null
+          played_at: string
+          team_id: string
+          tournament_id: string | null
+          tournament_name: string | null
+          tournament_type: string
+        }
+        Insert: {
+          external_match_id: string
+          fetched_at?: string
+          goals_against: number
+          goals_for: number
+          id?: string
+          is_home: boolean
+          opponent_elo?: number | null
+          opponent_external_id?: string | null
+          opponent_name?: string | null
+          played_at: string
+          team_id: string
+          tournament_id?: string | null
+          tournament_name?: string | null
+          tournament_type?: string
+        }
+        Update: {
+          external_match_id?: string
+          fetched_at?: string
+          goals_against?: number
+          goals_for?: number
+          id?: string
+          is_home?: boolean
+          opponent_elo?: number | null
+          opponent_external_id?: string | null
+          opponent_name?: string | null
+          played_at?: string
+          team_id?: string
+          tournament_id?: string | null
+          tournament_name?: string | null
+          tournament_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_match_history_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teams: {
         Row: {
           clubelo_rating: number | null
           clubelo_updated_at: string | null
+          competition_id: string | null
           country: string | null
           created_at: string
           elo: number | null
+          elo_club: number | null
+          elo_club_updated_at: string | null
+          elo_internal: number | null
+          elo_internal_matches: number
           external_id: string | null
           fetched_at: string | null
           history_checked_at: string | null
@@ -1121,9 +1347,14 @@ export type Database = {
         Insert: {
           clubelo_rating?: number | null
           clubelo_updated_at?: string | null
+          competition_id?: string | null
           country?: string | null
           created_at?: string
           elo?: number | null
+          elo_club?: number | null
+          elo_club_updated_at?: string | null
+          elo_internal?: number | null
+          elo_internal_matches?: number
           external_id?: string | null
           fetched_at?: string | null
           history_checked_at?: string | null
@@ -1139,9 +1370,14 @@ export type Database = {
         Update: {
           clubelo_rating?: number | null
           clubelo_updated_at?: string | null
+          competition_id?: string | null
           country?: string | null
           created_at?: string
           elo?: number | null
+          elo_club?: number | null
+          elo_club_updated_at?: string | null
+          elo_internal?: number | null
+          elo_internal_matches?: number
           external_id?: string | null
           fetched_at?: string | null
           history_checked_at?: string | null
@@ -1154,7 +1390,15 @@ export type Database = {
           source?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "teams_competition_id_fkey"
+            columns: ["competition_id"]
+            isOneToOne: false
+            referencedRelation: "competitions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_preferences: {
         Row: {
@@ -1188,7 +1432,33 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      model_accuracy_by_confidence: {
+        Row: {
+          avg_rps: number | null
+          confidence_band: string | null
+          model_version: string | null
+          n: number | null
+          pct_winner: number | null
+        }
+        Relationships: []
+      }
+      model_accuracy_summary: {
+        Row: {
+          avg_brier: number | null
+          avg_rps: number | null
+          model_version: string | null
+          n: number | null
+          naive_pct_bucket: number | null
+          naive_pct_winner: number | null
+          pct_exact: number | null
+          pct_goal_bucket: number | null
+          pct_goals_within_1: number | null
+          pct_ou25: number | null
+          pct_winner: number | null
+          scope: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       api_budget_take: {
@@ -1199,6 +1469,7 @@ export type Database = {
         Args: { kickoff: string; method: string }
         Returns: string
       }
+      goal_bucket: { Args: { total: number }; Returns: string }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
