@@ -59,8 +59,8 @@ export function rankedProbabilityScore(
   let cumO = 0;
   let sum = 0;
   for (let i = 0; i < 2; i++) {
-    cumP += probs[i];
-    cumO += observed[i];
+    cumP += probs[i] as number;
+    cumO += observed[i] as number;
     sum += (cumP - cumO) ** 2;
   }
   return sum / 2;
@@ -72,7 +72,7 @@ export function brierScore(
 ): number {
   const observed = [0, 0, 0];
   observed[outcomeIndex] = 1;
-  return probs.reduce((acc, p, i) => acc + (p - observed[i]) ** 2, 0);
+  return probs.reduce((acc, p, i) => acc + (p - (observed[i] as number)) ** 2, 0);
 }
 
 export function gradePrediction(

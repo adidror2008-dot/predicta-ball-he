@@ -19,7 +19,25 @@ function ltr(value: number | string): string {
 }
 
 export function factorToHebrew(factor: PredictionFactor): string {
-  const v = factor.values;
+  const v = factor.values as Record<string, number | string> & {
+    strongerTeam: string;
+    gap: number;
+    betterTeam: string;
+    homePoints: number;
+    awayPoints: number;
+    team: string;
+    goalsPerMatch: number;
+    concededPerMatch: number;
+    competition: string;
+    factor: number;
+    homeRestDays: number;
+    awayRestDays: number;
+    homeWins: number;
+    awayWins: number;
+    meetings: number;
+    homeMatches: number;
+    awayMatches: number;
+  };
 
   switch (factor.type) {
     case 'elo_gap':

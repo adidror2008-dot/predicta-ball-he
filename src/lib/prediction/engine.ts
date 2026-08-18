@@ -172,7 +172,7 @@ function buildMatrix(lambdaHome: number, lambdaAway: number): number[][] {
   for (let i = 0; i < size; i++) {
     const row: number[] = [];
     for (let j = 0; j < size; j++) {
-      const p = homePmf[i] * awayPmf[j];
+      const p = (homePmf[i] as number) * (awayPmf[j] as number);
       row.push(p);
       total += p;
     }
@@ -181,7 +181,8 @@ function buildMatrix(lambdaHome: number, lambdaAway: number): number[][] {
 
   // Renormalise: truncating at 8 goals loses a sliver of probability mass.
   for (let i = 0; i < size; i++) {
-    for (let j = 0; j < size; j++) matrix[i][j] /= total;
+    const row = matrix[i] as number[];
+    for (let j = 0; j < size; j++) row[j] = (row[j] as number) / total;
   }
   return matrix;
 }
@@ -406,7 +407,7 @@ export function predictMatch(input: PredictionInput): PredictionResult {
 
   for (let i = 0; i < size; i++) {
     for (let j = 0; j < size; j++) {
-      const p = matrix[i][j];
+      const p = (matrix[i] as number[])[j] as number;
       if (i > j) probHome += p;
       else if (i === j) probDraw += p;
       else probAway += p;
@@ -444,7 +445,7 @@ export function predictMatch(input: PredictionInput): PredictionResult {
     defenceStrength: round(homeStrength.defence, 3),
     formPoints: computeFormPoints(homeHistory),
     daysSinceLastMatch: homeHistory.matches.length
-      ? daysBetween(homeHistory.matches[0].date, kickoff)
+      ? daysBetween(homeHistory.matches[0]!.date, kickoff)
       : 0,
   };
 
@@ -458,7 +459,7 @@ export function predictMatch(input: PredictionInput): PredictionResult {
     defenceStrength: round(awayStrength.defence, 3),
     formPoints: computeFormPoints(awayHistory),
     daysSinceLastMatch: awayHistory.matches.length
-      ? daysBetween(awayHistory.matches[0].date, kickoff)
+      ? daysBetween(awayHistory.matches[0]!.date, kickoff)
       : 0,
   };
 
@@ -508,7 +509,7 @@ export function predictMatch(input: PredictionInput): PredictionResult {
     homeStats: homeDiag,
     awayStats: awayDiag,
     eloDiff,
-    h2h,
+    ...(h2h ? { h2h } : {}),
   });
 
   return {

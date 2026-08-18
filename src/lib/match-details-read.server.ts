@@ -314,14 +314,14 @@ export async function getMatchPrediction(matchRef: string): Promise<MatchPredict
   const { data } = await supabaseAdmin
     .from("predictions")
     .select(
-      "predicted_home_score, predicted_away_score, prob_home, prob_draw, prob_away, confidence, reasons_he",
+      "predicted_home_score, predicted_away_score, prob_home, prob_draw, prob_away, confidence, reason_lines_he",
     )
     .eq("match_id", match.id)
     .maybeSingle();
   if (!data) return null;
 
-  const reasons = Array.isArray(data.reasons_he)
-    ? (data.reasons_he as unknown[]).filter((r): r is string => typeof r === "string")
+  const reasons = Array.isArray(data.reason_lines_he)
+    ? (data.reason_lines_he as unknown[]).filter((r): r is string => typeof r === "string")
     : [];
 
   const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
