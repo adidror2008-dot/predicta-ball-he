@@ -1,560 +1,514 @@
 /**
- * PredictaBall — prediction engine v7
+ * PredictaBall — prediction engine. Pure maths.
  *
- * A pure function. No fetch, no DB, no clock, no randomness.
- * Same input always produces exactly the same output, which is what makes it testable
- * and what makes the accuracy numbers in Settings meaningful.
- *
- * Pipeline:
- *   history -> per-match weights (type x opponent strength x recency)
- *           -> weighted goal rates -> shrinkage toward league average
- *           -> attack/defence strengths -> lambdas (+ home advantage, Elo, rest)
- *           -> 9x9 Negative Binomial matrix
- *           -> EVERY output derived from that one matrix
+ * No DB, no fetch, no env, no clock, no randomness. Inputs in, prediction out.
+ * Every tunable number comes from the EngineConfig argument (the model_config
+ * table). A missing key throws immediately — the engine never substitutes a
+ * silent default, because a silent default is an invented number.
  */
 
-import { CONFIG, ENGINE_VERSION } from './config';
-import {
-  clamp,
-  daysBetween,
-  effectiveSampleSize,
-  negBinomialPmf,
-  round,
-  weightedMean,
-} from './math';
+import { factorsToHebrew } from './reasons';
 import type {
   CompetitionInput,
   ConfidenceBand,
+  EngineConfig,
+  EngineInput,
+  EngineResult,
+  Factor,
+  FactorSide,
   GoalBucket,
-  HistoricalMatch,
-  PredictionFactor,
-  PredictionInput,
-  PredictionResult,
-  TeamDiagnostics,
+  HistoryMatch,
+  Prediction,
   TeamInput,
 } from './types';
 
-interface WeightedHistory {
-  matches: HistoricalMatch[];
-  weights: number[];
-  /** Goals normalised to what they would have been against an average opponent. */
-  adjustedFor: number[];
-  adjustedAgainst: number[];
-  eligibleCount: number;
-  effectiveSample: number;
+/** Structural constants only — not model parameters. */
+const PROB_DP = 4;
+const GOALS_DP = 2;
+const FALLBACK_ELO = 1500;
+const FORM_WINDOW = 3;
+const POINTS_WIN = 3;
+const POINTS_DRAW = 1;
+const POINTS_LOSS = 0;
+const ELO_SIGNAL_MIN_GAP = 15;
+const ELO_FACTOR_SCALE = 400;
+const FORM_FACTOR_SCALE = 9;
+const LAMBDA_FACTOR_SCALE = 3;
+const REST_FACTOR_SCALE = 7;
+const REST_FACTOR_MIN_DIFF = 2;
+const DATA_QUALITY_TARGET = 6;
+const DATA_QUALITY_ESTIMATED_PENALTY = 0.3;
+const ESTIMATED_CAVEAT_SHARE = 0.5;
+const LOW_SAMPLE_MATCHES = 3;
+const MAX_RANKED_FACTORS = 3;
+
+function cfg(config: EngineConfig, key: string): number {
+  const value = config[key];
+  if (value === undefined || value === null || Number.isNaN(value)) {
+    throw new Error(`Missing model_config key: ${key}`);
+  }
+  return value;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function roundTo(value: number, dp: number): number {
+  const f = Math.pow(10, dp);
+  return Math.round(value * f) / f;
 }
 
 /**
- * Builds, for every historical match, BOTH:
- *   (a) opponent-normalised goals — the part that actually discounts a 4-0 over a
- *       bottom club versus a 4-0 over a title contender, and
- *   (b) an informativeness weight.
- *
- * Keeping these separate matters. A weight alone cannot discount a weak opponent:
- * if every opponent is weak, a common factor cancels out of the weighted average
- * and the discount silently does nothing. The normalisation is what bites.
- *
- * Weight layers:
- *   type       — how serious the match was (friendly counts a quarter)
- *   mismatch   — a lopsided fixture in EITHER direction tells us less
- *   unknown    — opponent level genuinely unknown: reduced trust, no normalisation
- *   recency    — newest matches dominate
+ * Rounds a probability group to 4 dp and pushes the residual into the largest
+ * member, so the group sums to exactly 1.0000 and the DB CHECK constraints pass.
  */
-function buildWeights(team: TeamInput, competition: CompetitionInput): WeightedHistory {
-  const matches = team.history.slice(0, CONFIG.MAX_HISTORY);
-  const weights: number[] = [];
-  const adjustedFor: number[] = [];
-  const adjustedAgainst: number[] = [];
-  let eligibleCount = 0;
-
-  matches.forEach((match, index) => {
-    const typeWeight = CONFIG.TYPE_WEIGHTS[match.matchType] ?? CONFIG.TYPE_WEIGHTS.other;
-
-    let opponentWeight: number;
-    let normFactor = 1;
-
-    if (match.opponentElo === null) {
-      // We do not know the level, so we do not pretend to correct for it.
-      opponentWeight = CONFIG.UNKNOWN_OPPONENT_WEIGHT;
-    } else {
-      const gap = competition.referenceElo - match.opponentElo; // >0 means weak opponent
-      normFactor = clamp(
-        Math.exp((CONFIG.OPPONENT_ADJUST_STRENGTH * gap) / 400),
-        CONFIG.OPPONENT_ADJUST_MIN,
-        CONFIG.OPPONENT_ADJUST_MAX,
-      );
-      opponentWeight = clamp(
-        1 - Math.abs(gap) / CONFIG.OPPONENT_ELO_SCALE,
-        CONFIG.OPPONENT_WEIGHT_FLOOR,
-        1,
-      );
+function normalizeGroup(values: number[]): number[] {
+  const rounded = values.map((v) => roundTo(v, PROB_DP));
+  const sum = rounded.reduce((a, b) => a + b, 0);
+  const residual = roundTo(1 - sum, PROB_DP);
+  if (residual !== 0) {
+    let maxIndex = 0;
+    for (let i = 1; i < rounded.length; i++) {
+      if ((rounded[i] as number) > (rounded[maxIndex] as number)) maxIndex = i;
     }
-
-    // Weak opponent -> concedes more, so goals scored are worth less.
-    adjustedFor.push(match.goalsFor / normFactor);
-    // Weak opponent -> scores less, so a clean sheet against them proves less.
-    adjustedAgainst.push(match.goalsAgainst * normFactor);
-
-    const recencyWeight = Math.pow(0.5, index / CONFIG.RECENCY_HALFLIFE_MATCHES);
-    weights.push(typeWeight * opponentWeight * recencyWeight);
-
-    const countsTowardFloor =
-      match.matchType !== 'friendly' || CONFIG.FRIENDLIES_COUNT_TOWARD_MINIMUM;
-    if (countsTowardFloor) eligibleCount += 1;
-  });
-
-  return {
-    matches,
-    weights,
-    adjustedFor,
-    adjustedAgainst,
-    eligibleCount,
-    effectiveSample: effectiveSampleSize(weights),
-  };
-}
-
-/** Weighted, then shrunk toward the league average. Returns attack/defence strengths. */
-function computeStrengths(
-  history: WeightedHistory,
-  leagueGoalsPerTeam: number,
-): { attack: number; defence: number; rawFor: number; rawAgainst: number } {
-  const rawFor = weightedMean(history.adjustedFor, history.weights);
-  const rawAgainst = weightedMean(history.adjustedAgainst, history.weights);
-
-  const n = history.effectiveSample;
-  const k = CONFIG.SHRINKAGE_PSEUDO_MATCHES;
-
-  const shrunkFor = (n * rawFor + k * leagueGoalsPerTeam) / (n + k);
-  const shrunkAgainst = (n * rawAgainst + k * leagueGoalsPerTeam) / (n + k);
-
-  return {
-    attack: shrunkFor / leagueGoalsPerTeam,
-    defence: shrunkAgainst / leagueGoalsPerTeam,
-    rawFor,
-    rawAgainst,
-  };
-}
-
-/** Weighted points (3/1/0) from the most recent 3 eligible matches. */
-function computeFormPoints(history: WeightedHistory): number {
-  let points = 0;
-  let counted = 0;
-  for (const match of history.matches) {
-    if (match.matchType === 'friendly') continue;
-    if (match.goalsFor > match.goalsAgainst) points += 3;
-    else if (match.goalsFor === match.goalsAgainst) points += 1;
-    counted += 1;
-    if (counted === 3) break;
+    rounded[maxIndex] = roundTo((rounded[maxIndex] as number) + residual, PROB_DP);
   }
-  return points;
+  return rounded;
 }
 
-function restMultiplier(restDays: number | null): number {
+function poisson(k: number, lambda: number): number {
+  let fact = 1;
+  for (let i = 2; i <= k; i++) fact *= i;
+  return (Math.exp(-lambda) * Math.pow(lambda, k)) / fact;
+}
+
+interface WeightedMatch {
+  match: HistoryMatch;
+  weight: number;
+  estimated: boolean;
+}
+
+interface TeamStats {
+  used: WeightedMatch[];
+  nEff: number;
+  gfAdj: number;
+  gaAdj: number;
+  formPoints: number;
+  estimatedCount: number;
+}
+
+function referenceElo(competition: CompetitionInput, home: TeamInput, away: TeamInput): number {
+  if (competition.refElo !== null) return competition.refElo;
+  const elos = [
+    home.eloInternal,
+    home.eloClub,
+    away.eloInternal,
+    away.eloClub,
+  ].filter((e): e is number => e !== null);
+  if (elos.length === 0) return FALLBACK_ELO;
+  return elos.reduce((a, b) => a + b, 0) / elos.length;
+}
+
+/** Steps 1 and 3: take the history, weight it, reduce it to weighted rates. */
+function weighHistory(team: TeamInput, config: EngineConfig, refElo: number): WeightedMatch[] {
+  const maxMatches = cfg(config, 'history_max_matches');
+  const wOfficial = cfg(config, 'weight_official');
+  const wFriendly = cfg(config, 'weight_friendly');
+  const wUnknownType = cfg(config, 'weight_unknown_type');
+  const wUnknownOpp = cfg(config, 'weight_unknown_opponent');
+  const oppScale = cfg(config, 'opp_elo_scale');
+  const oppFloor = cfg(config, 'opp_weight_floor');
+  const decay = cfg(config, 'recency_decay');
+
+  const out: WeightedMatch[] = [];
+  const slice = team.history.slice(0, maxMatches);
+
+  for (let i = 0; i < slice.length; i++) {
+    const m = slice[i] as HistoryMatch;
+    if (m.tournamentType === 'youth') continue;
+
+    const wType =
+      m.tournamentType === 'official'
+        ? wOfficial
+        : m.tournamentType === 'friendly'
+          ? wFriendly
+          : wUnknownType;
+
+    const estimated = m.opponentElo === null;
+    const wOpp = estimated
+      ? wUnknownOpp
+      : clamp(1 - (refElo - (m.opponentElo as number)) / oppScale, oppFloor, 1);
+
+    const wTime = Math.pow(decay, i);
+
+    out.push({ match: m, weight: wType * wOpp * wTime, estimated });
+  }
+
+  return out;
+}
+
+function teamStats(used: WeightedMatch[], leagueAvg: number, config: EngineConfig): TeamStats {
+  const shrinkK = cfg(config, 'shrinkage_k');
+
+  let nEff = 0;
+  let sumFor = 0;
+  let sumAgainst = 0;
+  let estimatedCount = 0;
+
+  for (const wm of used) {
+    nEff += wm.weight;
+    sumFor += wm.weight * wm.match.goalsFor;
+    sumAgainst += wm.weight * wm.match.goalsAgainst;
+    if (wm.estimated) estimatedCount++;
+  }
+
+  const gf = nEff > 0 ? sumFor / nEff : leagueAvg;
+  const ga = nEff > 0 ? sumAgainst / nEff : leagueAvg;
+  const alpha = nEff / (nEff + shrinkK);
+
+  let formPoints = 0;
+  for (const wm of used.slice(0, FORM_WINDOW)) {
+    formPoints +=
+      wm.match.goalsFor > wm.match.goalsAgainst
+        ? POINTS_WIN
+        : wm.match.goalsFor === wm.match.goalsAgainst
+          ? POINTS_DRAW
+          : POINTS_LOSS;
+  }
+
+  return {
+    used,
+    nEff,
+    gfAdj: alpha * gf + (1 - alpha) * leagueAvg,
+    gaAdj: alpha * ga + (1 - alpha) * leagueAvg,
+    formPoints,
+    estimatedCount,
+  };
+}
+
+function restFactor(restDays: number | null, config: EngineConfig): number {
   if (restDays === null) return 1;
-  const normalised = clamp((restDays - CONFIG.REST_NEUTRAL_DAYS) / 4, -1, 1);
-  return 1 + CONFIG.REST_COEFFICIENT * normalised;
+  const threshold = cfg(config, 'rest_days_threshold');
+  const perDay = cfg(config, 'rest_penalty_per_day');
+  const floor = cfg(config, 'rest_penalty_floor');
+  return clamp(1 - perDay * Math.max(0, threshold - restDays), floor, 1);
 }
 
-/** Builds the 9x9 joint matrix and normalises it to sum to exactly 1. */
-function buildMatrix(lambdaHome: number, lambdaAway: number): number[][] {
-  const size = CONFIG.MAX_GOALS + 1;
-  const r = CONFIG.NB_DISPERSION;
+export function predict(input: EngineInput, config: EngineConfig): EngineResult {
+  const { home, away, competition } = input;
 
-  const homePmf: number[] = [];
-  const awayPmf: number[] = [];
-  for (let k = 0; k < size; k++) {
-    homePmf.push(negBinomialPmf(k, lambdaHome, r));
-    awayPmf.push(negBinomialPmf(k, lambdaAway, r));
+  const minMatches = cfg(config, 'history_min_matches');
+  const globalHome = cfg(config, 'global_avg_goals_home');
+  const globalAway = cfg(config, 'global_avg_goals_away');
+
+  const refElo = referenceElo(competition, home, away);
+
+  // Step 1
+  const homeUsed = weighHistory(home, config, refElo);
+  const awayUsed = weighHistory(away, config, refElo);
+
+  // Step 2 — absolute gate
+  if (homeUsed.length < minMatches || awayUsed.length < minMatches) {
+    return {
+      ok: false,
+      reason: 'insufficient_history',
+      homeMatches: homeUsed.length,
+      awayMatches: awayUsed.length,
+      required: minMatches,
+    };
   }
 
+  // Step 4
+  let leagueAvg =
+    ((competition.avgGoalsHome ?? globalHome) + (competition.avgGoalsAway ?? globalAway)) / 2;
+  if (!(leagueAvg > 0)) leagueAvg = (globalHome + globalAway) / 2;
+
+  const homeStats = teamStats(homeUsed, leagueAvg, config);
+  const awayStats = teamStats(awayUsed, leagueAvg, config);
+
+  // Step 5
+  const eloScale = cfg(config, 'elo_goal_scale');
+  const multMin = cfg(config, 'elo_mult_min');
+  const multMax = cfg(config, 'elo_mult_max');
+  const eloHome = home.eloInternal ?? home.eloClub ?? refElo;
+  const eloAway = away.eloInternal ?? away.eloClub ?? refElo;
+  const d = eloHome - eloAway;
+  const multHome = clamp(Math.exp(d / eloScale), multMin, multMax);
+  const multAway = clamp(Math.exp(-d / eloScale), multMin, multMax);
+
+  // Step 6
+  const restHome = restFactor(home.restDays, config);
+  const restAway = restFactor(away.restDays, config);
+
+  // Step 7
+  const lambdaMin = cfg(config, 'lambda_min');
+  const lambdaMax = cfg(config, 'lambda_max');
+  const lambdaHome = clamp(
+    ((homeStats.gfAdj * awayStats.gaAdj) / leagueAvg) *
+      competition.homeAdvantage *
+      multHome *
+      restHome,
+    lambdaMin,
+    lambdaMax,
+  );
+  const lambdaAway = clamp(
+    ((awayStats.gfAdj * homeStats.gaAdj) / leagueAvg) * multAway * restAway,
+    lambdaMin,
+    lambdaMax,
+  );
+
+  // Step 8 — Poisson grid, normalized so the truncated tail folds back in
+  const n = cfg(config, 'max_goals_grid');
+  const size = n + 1;
   const matrix: number[][] = [];
   let total = 0;
   for (let i = 0; i < size; i++) {
     const row: number[] = [];
     for (let j = 0; j < size; j++) {
-      const p = (homePmf[i] as number) * (awayPmf[j] as number);
+      const p = poisson(i, lambdaHome) * poisson(j, lambdaAway);
       row.push(p);
       total += p;
     }
     matrix.push(row);
   }
-
-  // Renormalise: truncating at 8 goals loses a sliver of probability mass.
   for (let i = 0; i < size; i++) {
     const row = matrix[i] as number[];
     for (let j = 0; j < size; j++) row[j] = (row[j] as number) / total;
   }
-  return matrix;
-}
 
-function bandFor(confidence: number): ConfidenceBand {
-  if (confidence >= CONFIG.CONFIDENCE_BAND_HIGH) return 'high';
-  if (confidence >= CONFIG.CONFIDENCE_BAND_MEDIUM) return 'medium';
-  return 'low';
-}
-
-/**
- * Builds the reasons AS DATA. The AI phrasing layer may only reword these,
- * never add a reason of its own. Every factor carries the numbers behind it.
- */
-function buildFactors(args: {
-  home: TeamInput;
-  away: TeamInput;
-  competition: CompetitionInput;
-  homeStats: TeamDiagnostics;
-  awayStats: TeamDiagnostics;
-  eloDiff: number | null;
-  h2h?: HistoricalMatch[];
-}): PredictionFactor[] {
-  const { home, away, competition, homeStats, awayStats, eloDiff, h2h } = args;
-  const factors: PredictionFactor[] = [];
-
-  if (eloDiff !== null && Math.abs(eloDiff) >= CONFIG.FACTOR_MIN_ELO_GAP) {
-    factors.push({
-      type: 'elo_gap',
-      side: eloDiff > 0 ? 'home' : 'away',
-      impact: clamp(Math.abs(eloDiff) / 300, 0, 1),
-      values: {
-        gap: Math.round(Math.abs(eloDiff)),
-        strongerTeam: eloDiff > 0 ? home.name : away.name,
-      },
-    });
-  }
-
-  const formDiff = homeStats.formPoints - awayStats.formPoints;
-  if (Math.abs(formDiff) >= 3) {
-    factors.push({
-      type: 'form',
-      side: formDiff > 0 ? 'home' : 'away',
-      impact: clamp(Math.abs(formDiff) / 9, 0, 1),
-      values: {
-        homePoints: homeStats.formPoints,
-        awayPoints: awayStats.formPoints,
-        betterTeam: formDiff > 0 ? home.name : away.name,
-      },
-    });
-  }
-
-  const attackDiff = homeStats.attackStrength - awayStats.attackStrength;
-  if (Math.abs(attackDiff) >= 0.2) {
-    const side = attackDiff > 0 ? 'home' : 'away';
-    factors.push({
-      type: 'attack',
-      side,
-      impact: clamp(Math.abs(attackDiff) / 0.8, 0, 1),
-      values: {
-        team: side === 'home' ? home.name : away.name,
-        goalsPerMatch: round(
-          side === 'home' ? homeStats.rawGoalsFor : awayStats.rawGoalsFor,
-          2,
-        ),
-      },
-    });
-  }
-
-  const defenceDiff = awayStats.defenceStrength - homeStats.defenceStrength;
-  if (Math.abs(defenceDiff) >= 0.2) {
-    const side = defenceDiff > 0 ? 'home' : 'away';
-    factors.push({
-      type: 'defence',
-      side,
-      impact: clamp(Math.abs(defenceDiff) / 0.8, 0, 1),
-      values: {
-        team: side === 'home' ? home.name : away.name,
-        concededPerMatch: round(
-          side === 'home' ? homeStats.rawGoalsAgainst : awayStats.rawGoalsAgainst,
-          2,
-        ),
-      },
-    });
-  }
-
-  if (competition.homeAdvantage >= CONFIG.FACTOR_NOTABLE_HOME_ADVANTAGE) {
-    factors.push({
-      type: 'home_advantage',
-      side: 'home',
-      impact: clamp((competition.homeAdvantage - 1) / 0.4, 0, 1),
-      values: {
-        factor: round(competition.homeAdvantage, 2),
-        competition: competition.name,
-      },
-    });
-  }
-
-  if (home.restDays !== null && away.restDays !== null) {
-    const restDiff = home.restDays - away.restDays;
-    if (Math.abs(restDiff) >= CONFIG.FACTOR_MIN_REST_DIFF) {
-      factors.push({
-        type: 'rest',
-        side: restDiff > 0 ? 'home' : 'away',
-        impact: clamp(Math.abs(restDiff) / 7, 0, 1),
-        values: { homeRestDays: home.restDays, awayRestDays: away.restDays },
-      });
-    }
-  }
-
-  if (h2h && h2h.length >= 3) {
-    const wins = h2h.filter((m) => m.goalsFor > m.goalsAgainst).length;
-    const losses = h2h.filter((m) => m.goalsFor < m.goalsAgainst).length;
-    if (wins !== losses) {
-      factors.push({
-        type: 'h2h',
-        side: wins > losses ? 'home' : 'away',
-        impact: clamp(Math.abs(wins - losses) / h2h.length, 0, 0.5),
-        values: { meetings: h2h.length, homeWins: wins, awayWins: losses },
-      });
-    }
-  }
-
-  // Honesty factor: if we barely know anything, say so instead of hiding it.
-  const thinnest = Math.min(homeStats.effectiveSample, awayStats.effectiveSample);
-  if (thinnest < CONFIG.FACTOR_THIN_DATA_SAMPLE) {
-    factors.push({
-      type: 'thin_data',
-      side: 'none',
-      impact: 0.55,
-      values: {
-        homeMatches: homeStats.usedMatches,
-        awayMatches: awayStats.usedMatches,
-      },
-    });
-  }
-
-  return factors.sort((a, b) => b.impact - a.impact).slice(0, CONFIG.MAX_FACTORS);
-}
-
-/**
- * Main entry point.
- * Returns either a full prediction or an explicit refusal — never a guess.
- */
-export function predictMatch(input: PredictionInput): PredictionResult {
-  const { home, away, competition, kickoff, h2h } = input;
-
-  const homeHistory = buildWeights(home, competition);
-  const awayHistory = buildWeights(away, competition);
-
-  // The floor. Golden rule: no real data -> no prediction, in every path including cups.
-  if (
-    homeHistory.eligibleCount < CONFIG.MIN_ELIGIBLE_MATCHES ||
-    awayHistory.eligibleCount < CONFIG.MIN_ELIGIBLE_MATCHES
-  ) {
-    return {
-      eligible: false,
-      modelVersion: ENGINE_VERSION,
-      reason: 'insufficient_history',
-      detail: {
-        homeEligibleMatches: homeHistory.eligibleCount,
-        awayEligibleMatches: awayHistory.eligibleCount,
-        required: CONFIG.MIN_ELIGIBLE_MATCHES,
-      },
-    };
-  }
-
-  const leagueGoalsPerTeam = competition.leagueAvgGoals / 2;
-  const homeStrength = computeStrengths(homeHistory, leagueGoalsPerTeam);
-  const awayStrength = computeStrengths(awayHistory, leagueGoalsPerTeam);
-
-  // Home advantage splits both ways so it shifts WHO scores without inventing goals.
-  const haSplit = Math.sqrt(competition.homeAdvantage);
-
-  const eloUsed = home.elo !== null && away.elo !== null;
-  const eloDiff = eloUsed ? (home.elo as number) - (away.elo as number) : null;
-  const eloMultiplier = eloUsed
-    ? clamp(
-        Math.exp((CONFIG.ELO_WEIGHT * (eloDiff as number)) / 400),
-        CONFIG.ELO_MULTIPLIER_MIN,
-        CONFIG.ELO_MULTIPLIER_MAX,
-      )
-    : 1;
-
-  const restUsed = home.restDays !== null && away.restDays !== null;
-  const homeRest = restUsed ? restMultiplier(home.restDays) : 1;
-  const awayRest = restUsed ? restMultiplier(away.restDays) : 1;
-
-  const lambdaHome = clamp(
-    leagueGoalsPerTeam *
-      homeStrength.attack *
-      awayStrength.defence *
-      haSplit *
-      eloMultiplier *
-      homeRest,
-    CONFIG.LAMBDA_MIN,
-    CONFIG.LAMBDA_MAX,
-  );
-
-  const lambdaAway = clamp(
-    (leagueGoalsPerTeam * awayStrength.attack * homeStrength.defence * awayRest) /
-      (haSplit * eloMultiplier),
-    CONFIG.LAMBDA_MIN,
-    CONFIG.LAMBDA_MAX,
-  );
-
-  const matrix = buildMatrix(lambdaHome, lambdaAway);
-  const size = CONFIG.MAX_GOALS + 1;
-
-  // --- everything below is DERIVED from the matrix. Nothing is computed separately. ---
-  let probHome = 0;
-  let probDraw = 0;
-  let probAway = 0;
-  let probOver25 = 0;
-  let probBtts = 0;
-  let bucket01 = 0;
-  let bucket23 = 0;
-  let bucket4plus = 0;
+  // Step 9 — everything is read off the grid
+  let bestI = 0;
+  let bestJ = 0;
   let bestP = -1;
-  let bestHome = 0;
-  let bestAway = 0;
+  let pHome = 0;
+  let pDraw = 0;
+  let pAway = 0;
+  let pOver = 0;
+  let pBtts = 0;
+  let p01 = 0;
+  let p23 = 0;
+  let p4 = 0;
 
   for (let i = 0; i < size; i++) {
     for (let j = 0; j < size; j++) {
       const p = (matrix[i] as number[])[j] as number;
-      if (i > j) probHome += p;
-      else if (i === j) probDraw += p;
-      else probAway += p;
+      const totalGoals = i + j;
 
-      const total = i + j;
-      if (total > 2.5) probOver25 += p;
-      if (i >= 1 && j >= 1) probBtts += p;
+      if (i > j) pHome += p;
+      else if (i === j) pDraw += p;
+      else pAway += p;
 
-      if (total <= 1) bucket01 += p;
-      else if (total <= 3) bucket23 += p;
-      else bucket4plus += p;
+      if (totalGoals >= LAMBDA_FACTOR_SCALE) pOver += p;
+      if (i >= 1 && j >= 1) pBtts += p;
+      if (totalGoals <= 1) p01 += p;
+      else if (totalGoals <= LAMBDA_FACTOR_SCALE) p23 += p;
+      else p4 += p;
 
-      if (p > bestP) {
+      const better =
+        p > bestP ||
+        (p === bestP &&
+          (totalGoals < bestI + bestJ || (totalGoals === bestI + bestJ && i > bestI)));
+      if (better) {
         bestP = p;
-        bestHome = i;
-        bestAway = j;
+        bestI = i;
+        bestJ = j;
       }
     }
   }
 
-  const buckets: Array<[GoalBucket, number]> = [
-    ['0-1', bucket01],
-    ['2-3', bucket23],
-    ['4+', bucket4plus],
+  const [probHome, probDraw, probAway] = normalizeGroup([pHome, pDraw, pAway]) as [
+    number,
+    number,
+    number,
   ];
-  const predictedBucket = buckets.reduce((a, b) => (b[1] > a[1] ? b : a))[0];
+  const [probOver25, probUnder25] = normalizeGroup([pOver, 1 - pOver]) as [number, number];
+  const [probGoals01, probGoals23, probGoals4Plus] = normalizeGroup([p01, p23, p4]) as [
+    number,
+    number,
+    number,
+  ];
+  const probBtts = roundTo(pBtts, PROB_DP);
 
-  const homeDiag: TeamDiagnostics = {
-    teamId: home.teamId,
-    usedMatches: homeHistory.matches.length,
-    effectiveSample: round(homeHistory.effectiveSample, 3),
-    rawGoalsFor: round(homeStrength.rawFor, 3),
-    rawGoalsAgainst: round(homeStrength.rawAgainst, 3),
-    attackStrength: round(homeStrength.attack, 3),
-    defenceStrength: round(homeStrength.defence, 3),
-    formPoints: computeFormPoints(homeHistory),
-    daysSinceLastMatch: homeHistory.matches.length
-      ? daysBetween(homeHistory.matches[0]!.date, kickoff)
-      : 0,
-  };
+  const buckets: Array<[GoalBucket, number]> = [
+    ['0-1', probGoals01],
+    ['2-3', probGoals23],
+    ['4+', probGoals4Plus],
+  ];
+  let predictedGoalBucket: GoalBucket = '2-3';
+  let bucketBest = -1;
+  for (const [key, value] of buckets) {
+    if (value > bucketBest) {
+      bucketBest = value;
+      predictedGoalBucket = key;
+    }
+  }
 
-  const awayDiag: TeamDiagnostics = {
-    teamId: away.teamId,
-    usedMatches: awayHistory.matches.length,
-    effectiveSample: round(awayHistory.effectiveSample, 3),
-    rawGoalsFor: round(awayStrength.rawFor, 3),
-    rawGoalsAgainst: round(awayStrength.rawAgainst, 3),
-    attackStrength: round(awayStrength.attack, 3),
-    defenceStrength: round(awayStrength.defence, 3),
-    formPoints: computeFormPoints(awayHistory),
-    daysSinceLastMatch: awayHistory.matches.length
-      ? daysBetween(awayHistory.matches[0]!.date, kickoff)
-      : 0,
-  };
+  // Step 10 — confidence
+  const usedTotal = homeUsed.length + awayUsed.length;
+  const estimatedShare =
+    usedTotal > 0 ? (homeStats.estimatedCount + awayStats.estimatedCount) / usedTotal : 0;
 
-  // --- confidence: three measured components, never a hand-picked number ---
-  const maxProb = Math.max(probHome, probDraw, probAway);
-  const decisiveness = clamp(
-    (maxProb - CONFIG.DECISIVENESS_FLOOR) /
-      (CONFIG.DECISIVENESS_CEILING - CONFIG.DECISIVENESS_FLOOR),
-    0,
-    1,
-  );
+  const topProb = Math.max(probHome, probDraw, probAway);
+  const decisive = clamp((topProb - 1 / 3) / (2 / 3), 0, 1);
+  const dataQ =
+    Math.min(1, Math.min(homeStats.nEff, awayStats.nEff) / DATA_QUALITY_TARGET) *
+    (1 - DATA_QUALITY_ESTIMATED_PENALTY * estimatedShare);
 
-  const sampleScore = clamp(
-    Math.min(homeDiag.effectiveSample, awayDiag.effectiveSample) /
-      CONFIG.DATA_QUALITY_TARGET_SAMPLE,
-    0,
-    1,
-  );
-  const stalest = Math.max(homeDiag.daysSinceLastMatch, awayDiag.daysSinceLastMatch);
-  const freshness = clamp(
-    (CONFIG.FRESHNESS_MAX_DAYS - stalest) /
-      (CONFIG.FRESHNESS_MAX_DAYS - CONFIG.FRESHNESS_FULL_DAYS),
-    0,
-    1,
-  );
-  const dataQuality = 0.6 * sampleScore + 0.25 * (eloUsed ? 1 : 0) + 0.15 * freshness;
+  const predictedSide: FactorSide =
+    probHome > probAway && probHome > probDraw
+      ? 'home'
+      : probAway > probHome && probAway > probDraw
+        ? 'away'
+        : 'none';
 
-  const formEdge = Math.sign(
-    homeStrength.attack * awayStrength.defence -
-      awayStrength.attack * homeStrength.defence,
-  );
-  const eloEdge = eloDiff === null ? 0 : Math.sign(eloDiff);
+  const signals: FactorSide[] = [];
+  signals.push(Math.abs(d) < ELO_SIGNAL_MIN_GAP ? 'none' : d > 0 ? 'home' : 'away');
+  const formDiff = homeStats.formPoints - awayStats.formPoints;
+  signals.push(Math.abs(formDiff) < 1 ? 'none' : formDiff > 0 ? 'home' : 'away');
+  if (home.eloClub !== null && away.eloClub !== null) {
+    const clubGap = home.eloClub - away.eloClub;
+    signals.push(Math.abs(clubGap) < ELO_SIGNAL_MIN_GAP ? 'none' : clubGap > 0 ? 'home' : 'away');
+  }
+
   const agreement =
-    eloEdge === 0 || formEdge === 0 ? 0.5 : eloEdge === formEdge ? 1 : 0;
+    signals.length === 0
+      ? 1 / 2
+      : predictedSide === 'none'
+        ? signals.filter((s) => s === 'none').length / signals.length
+        : signals.filter((s) => s === predictedSide).length / signals.length;
 
-  const confidence = Math.round(
-    100 *
-      (CONFIG.CONFIDENCE_WEIGHTS.decisiveness * decisiveness +
-        CONFIG.CONFIDENCE_WEIGHTS.dataQuality * dataQuality +
-        CONFIG.CONFIDENCE_WEIGHTS.agreement * agreement),
+  const confidence = clamp(
+    Math.round(
+      100 *
+        (cfg(config, 'conf_w_decisive') * decisive +
+          cfg(config, 'conf_w_data') * dataQ +
+          cfg(config, 'conf_w_agreement') * agreement),
+    ),
+    0,
+    100,
   );
+  const bandLow = cfg(config, 'conf_band_low_max');
+  const bandMid = cfg(config, 'conf_band_mid_max');
+  const confidenceBand: ConfidenceBand =
+    confidence <= bandLow ? 'low' : confidence <= bandMid ? 'mid' : 'high';
 
-  const factors = buildFactors({
-    home,
-    away,
-    competition,
-    homeStats: homeDiag,
-    awayStats: awayDiag,
-    eloDiff,
-    ...(h2h ? { h2h } : {}),
+  // Step 11 — factors
+  const roundedLambdaHome = roundTo(lambdaHome, GOALS_DP);
+  const roundedLambdaAway = roundTo(lambdaAway, GOALS_DP);
+  const ranked: Factor[] = [];
+
+  if (Math.abs(d) >= ELO_SIGNAL_MIN_GAP) {
+    ranked.push({
+      key: 'elo_gap',
+      side: d > 0 ? 'home' : 'away',
+      values: {
+        strongerTeam: d > 0 ? home.nameHe : away.nameHe,
+        gap: Math.round(Math.abs(d)),
+      },
+      impact: Math.abs(d) / ELO_FACTOR_SCALE,
+    });
+  }
+
+  ranked.push({
+    key: 'form',
+    side: formDiff > 0 ? 'home' : formDiff < 0 ? 'away' : 'none',
+    values: {
+      teamA: formDiff >= 0 ? home.nameHe : away.nameHe,
+      pointsA: formDiff >= 0 ? homeStats.formPoints : awayStats.formPoints,
+      teamB: formDiff >= 0 ? away.nameHe : home.nameHe,
+      pointsB: formDiff >= 0 ? awayStats.formPoints : homeStats.formPoints,
+    },
+    impact: Math.abs(formDiff) / FORM_FACTOR_SCALE,
   });
 
-  return {
-    eligible: true,
-    modelVersion: ENGINE_VERSION,
+  ranked.push({
+    key: 'attack_defence',
+    side:
+      roundedLambdaHome > roundedLambdaAway
+        ? 'home'
+        : roundedLambdaHome < roundedLambdaAway
+          ? 'away'
+          : 'none',
+    values: { lambdaHome: roundedLambdaHome, lambdaAway: roundedLambdaAway },
+    impact: Math.abs(lambdaHome - lambdaAway) / LAMBDA_FACTOR_SCALE,
+  });
 
-    lambdaHome: round(lambdaHome, 4),
-    lambdaAway: round(lambdaAway, 4),
+  ranked.push({
+    key: 'home_advantage',
+    side: 'home',
+    values: {
+      competition: competition.nameHe,
+      factor: roundTo(competition.homeAdvantage, GOALS_DP),
+    },
+    impact: (competition.homeAdvantage - 1) * 2,
+  });
 
-    predictedHomeScore: bestHome,
-    predictedAwayScore: bestAway,
-    probExactScore: round(bestP, 4),
+  if (home.restDays !== null && away.restDays !== null) {
+    const restDiff = Math.abs(home.restDays - away.restDays);
+    if (restDiff >= REST_FACTOR_MIN_DIFF) {
+      const homeIsTired = home.restDays < away.restDays;
+      ranked.push({
+        key: 'rest',
+        side: homeIsTired ? 'away' : 'home',
+        values: {
+          team: homeIsTired ? home.nameHe : away.nameHe,
+          restLow: Math.min(home.restDays, away.restDays),
+          restHigh: Math.max(home.restDays, away.restDays),
+        },
+        impact: restDiff / REST_FACTOR_SCALE,
+      });
+    }
+  }
 
-    probHome: round(probHome, 4),
-    probDraw: round(probDraw, 4),
-    probAway: round(probAway, 4),
+  ranked.sort((a, b) => b.impact - a.impact);
+  const factors: Factor[] = ranked.slice(0, MAX_RANKED_FACTORS);
 
-    expectedTotalGoals: round(lambdaHome + lambdaAway, 3),
-    probOver25: round(probOver25, 4),
-    probUnder25: round(1 - probOver25, 4),
-    probBtts: round(probBtts, 4),
+  if (estimatedShare > ESTIMATED_CAVEAT_SHARE) {
+    factors.push({
+      key: 'estimated_history',
+      side: 'none',
+      values: { share: roundTo(estimatedShare, GOALS_DP) },
+      impact: 0,
+    });
+  }
+  const minMatchesUsed = Math.min(homeUsed.length, awayUsed.length);
+  if (minMatchesUsed <= LOW_SAMPLE_MATCHES) {
+    factors.push({
+      key: 'low_sample',
+      side: 'none',
+      values: { matches: minMatchesUsed },
+      impact: 0,
+    });
+  }
 
-    bucket01: round(bucket01, 4),
-    bucket23: round(bucket23, 4),
-    bucket4plus: round(bucket4plus, 4),
-    predictedBucket,
-
+  const prediction: Prediction = {
+    lambdaHome: roundedLambdaHome,
+    lambdaAway: roundedLambdaAway,
+    predictedHomeScore: bestI,
+    predictedAwayScore: bestJ,
+    probHome,
+    probDraw,
+    probAway,
+    expectedTotalGoals: roundTo(lambdaHome + lambdaAway, GOALS_DP),
+    probOver25,
+    probUnder25,
+    probBtts,
+    probGoals01,
+    probGoals23,
+    probGoals4Plus,
+    predictedGoalBucket,
     confidence,
-    confidenceBand: bandFor(confidence),
-    confidenceParts: {
-      decisiveness: round(decisiveness, 3),
-      dataQuality: round(dataQuality, 3),
-      agreement,
-    },
-
+    confidenceBand,
     factors,
+    reasonLinesHe: factorsToHebrew(factors),
+    nEffHome: roundTo(homeStats.nEff, PROB_DP),
+    nEffAway: roundTo(awayStats.nEff, PROB_DP),
+    historyMatchesHome: homeUsed.length,
+    historyMatchesAway: awayUsed.length,
+    estimatedShare: roundTo(estimatedShare, PROB_DP),
     matrix,
-
-    diagnostics: {
-      home: homeDiag,
-      away: awayDiag,
-      eloUsed,
-      restUsed,
-      homeAdvantage: competition.homeAdvantage,
-      leagueAvgGoals: competition.leagueAvgGoals,
-    },
   };
+
+  return { ok: true, prediction };
 }
