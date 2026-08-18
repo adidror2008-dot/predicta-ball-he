@@ -62,6 +62,11 @@ function roundTo(value: number, dp: number): number {
 /**
  * Rounds a probability group to 4 dp and pushes the residual into the largest
  * member, so the group sums to exactly 1.0000 and the DB CHECK constraints pass.
+ *
+ * Tie rule: when two members tie for largest (a perfectly symmetric match, where
+ * probHome === probAway), the residual goes to the smallest member instead.
+ * Otherwise the rounding itself would invent a home/away edge that the maths
+ * never produced.
  */
 function normalizeGroup(values: number[]): number[] {
   const rounded = values.map((v) => roundTo(v, PROB_DP));
@@ -69,13 +74,24 @@ function normalizeGroup(values: number[]): number[] {
   const residual = roundTo(1 - sum, PROB_DP);
   if (residual !== 0) {
     let maxIndex = 0;
+    let minIndex = 0;
+    let maxTied = false;
     for (let i = 1; i < rounded.length; i++) {
-      if ((rounded[i] as number) > (rounded[maxIndex] as number)) maxIndex = i;
+      const v = rounded[i] as number;
+      if (v > (rounded[maxIndex] as number)) {
+        maxIndex = i;
+        maxTied = false;
+      } else if (v === (rounded[maxIndex] as number)) {
+        maxTied = true;
+      }
+      if (v < (rounded[minIndex] as number)) minIndex = i;
     }
-    rounded[maxIndex] = roundTo((rounded[maxIndex] as number) + residual, PROB_DP);
+    const target = maxTied ? minIndex : maxIndex;
+    rounded[target] = roundTo((rounded[target] as number) + residual, PROB_DP);
   }
   return rounded;
 }
+
 
 function poisson(k: number, lambda: number): number {
   let fact = 1;
