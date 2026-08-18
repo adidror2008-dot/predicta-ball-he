@@ -1471,6 +1471,23 @@ export type Database = {
       }
       goal_bucket: { Args: { total: number }; Returns: string }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      recompute_competition_baselines: {
+        Args: never
+        Returns: {
+          competitions_measured: number
+          competitions_total: number
+        }[]
+      }
+      recompute_internal_elo: {
+        Args: never
+        Returns: {
+          avg_rating: number
+          distinct_matches: number
+          rated_entities: number
+          skipped_null_opponent: number
+          teams_rated: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
