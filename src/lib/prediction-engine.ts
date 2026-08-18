@@ -213,7 +213,7 @@ export function computePrediction(
   const matrix: number[][] = [];
   for (let i = 0; i <= grid; i++) {
     matrix.push([]);
-    for (let j = 0; j <= grid; j++) matrix[i].push(ph[i] * pa[j]);
+    for (let j = 0; j <= grid; j++) matrix[i]!.push(ph[i]! * pa[j]!);
   }
 
   let probHome = 0, probDraw = 0, probAway = 0;
@@ -221,7 +221,7 @@ export function computePrediction(
   let prob01 = 0, prob23 = 0, probOver25 = 0, probBtts = 0;
   for (let i = 0; i <= grid; i++) {
     for (let j = 0; j <= grid; j++) {
-      const p = matrix[i][j];
+      const p = matrix[i]![j]!;
       if (i > j) probHome += p;
       else if (i === j) probDraw += p;
       else probAway += p;
