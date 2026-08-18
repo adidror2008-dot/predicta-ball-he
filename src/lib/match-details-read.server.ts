@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const SOURCE = "sofascore";
+const MODEL_VERSION = "v7.0";
 const PHOTO_BUCKET = "player-photos";
 const LOGO_BUCKET = "team-logos";
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
