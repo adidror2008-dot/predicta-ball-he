@@ -18,8 +18,8 @@ function logGamma(z: number): number {
     return Math.log(Math.PI / Math.sin(Math.PI * z)) - logGamma(1 - z);
   }
   z -= 1;
-  let x = c[0];
-  for (let i = 1; i < g + 2; i++) x += c[i] / (z + i);
+  let x = c[0] as number;
+  for (let i = 1; i < g + 2; i++) x += (c[i] as number) / (z + i);
   const t = z + g + 0.5;
   return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
 }
@@ -49,8 +49,8 @@ export function weightedMean(values: number[], weights: number[]): number {
   let num = 0;
   let den = 0;
   for (let i = 0; i < values.length; i++) {
-    num += values[i] * weights[i];
-    den += weights[i];
+    num += (values[i] as number) * (weights[i] as number);
+    den += weights[i] as number;
   }
   return den === 0 ? 0 : num / den;
 }
