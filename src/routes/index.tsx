@@ -76,7 +76,7 @@ function MatchesScreen() {
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const restored = useRef(false);
+  const lastScrollTarget = useRef<string | null>(null);
   const { prefs, hydrated, update } = useChipPrefs();
 
   const matches = useMemo(() => data ?? [], [data]);
