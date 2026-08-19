@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   closestCenter,
   useSensor,
@@ -56,7 +56,7 @@ function SortableChip({
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
-        touchAction: "auto",
+        touchAction: isDragging ? "none" : "pan-x",
       }}
       onClick={() => onSelect(competition.id)}
       className={chipClasses(active, competition.hasMatches, isDragging)}
@@ -87,8 +87,8 @@ export function CompetitionChips({
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { delay: 300, tolerance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } }),
+    useSensor(MouseSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 12 } }),
   );
 
   const dragged = competitions.find((c) => c.id === draggingId) ?? null;
