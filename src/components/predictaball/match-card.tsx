@@ -32,6 +32,7 @@ const statusClass: Record<MatchStatus, string> = {
 
 export function MatchCard({ match }: { match: MatchCardData }) {
   const hasScore = match.homeScore !== null && match.awayScore !== null;
+  const isFuture = match.status === "scheduled";
 
   return (
     <Link
@@ -49,7 +50,7 @@ export function MatchCard({ match }: { match: MatchCardData }) {
         >
           {statusLabel[match.status]}
         </span>
-        {match.date ? (
+        {!isFuture && match.date ? (
           <LtrNum className="text-[11px] text-muted-foreground">{match.date}</LtrNum>
         ) : null}
       </div>
@@ -65,6 +66,15 @@ export function MatchCard({ match }: { match: MatchCardData }) {
             <LtrNum className="text-lg font-bold">
               {match.homeScore} - {match.awayScore}
             </LtrNum>
+          ) : isFuture && match.date ? (
+            <div className="flex flex-col items-center gap-0.5">
+              <LtrNum className="text-[11px] text-muted-foreground">{match.date}</LtrNum>
+              {match.kickoffTime ? (
+                <LtrNum className="text-sm font-medium text-muted-foreground">{match.kickoffTime}</LtrNum>
+              ) : (
+                <span className="text-sm text-muted-foreground">—</span>
+              )}
+            </div>
           ) : match.kickoffTime ? (
             <LtrNum className="text-sm font-medium text-muted-foreground">
               {match.kickoffTime}
@@ -82,3 +92,4 @@ export function MatchCard({ match }: { match: MatchCardData }) {
     </Link>
   );
 }
+
