@@ -37,8 +37,9 @@ export const Route = createFileRoute("/")({
 });
 
 const TAB_KEY = "pb:matches:activeCompetition";
-const SCROLL_KEY = "pb:matches:scrollY";
 const OTHER = "__other__";
+const SCROLL_OFFSET = 12;
+const PAST_MATCHES_ABOVE = 2;
 
 function toStatus(status: string | null): MatchStatus {
   if (status === "finished" || status === "ended" || status === "afterET" || status === "ap") {
@@ -75,7 +76,7 @@ function MatchesScreen() {
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const restored = useRef(false);
+  const lastScrollTarget = useRef<string | null>(null);
   const { prefs, hydrated, update } = useChipPrefs();
 
   const matches = useMemo(() => data ?? [], [data]);
@@ -126,18 +127,6 @@ function MatchesScreen() {
     if (saved) setActiveId(saved);
   }, []);
 
-  useEffect(() => {
-    if (isLoading || restored.current) return;
-    restored.current = true;
-    const y = Number(sessionStorage.getItem(SCROLL_KEY) ?? 0);
-    if (y > 0) window.scrollTo(0, y);
-  }, [isLoading]);
-
-  useEffect(() => {
-    const onScroll = () => sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
 
   const selectCompetition = (id: string) => {
     const next = activeId === id ? null : id;
@@ -184,6 +173,32 @@ function MatchesScreen() {
     );
     return ordered;
   }, [matches, activeId, selectedSet, prefs.order]);
+
+  // The list opens on the nearest upcoming (or live) match, keeping two
+  // finished matches visible above it as a time anchor.
+  const scrollTargetId = useMemo(() => {
+    const flat = groups.flatMap((g) => g.matches);
+    if (flat.length === 0) return null;
+    const anchor = flat.findIndex((m) => m.status !== "finished");
+    if (anchor < 0) return flat[flat.length - 1]!.id;
+    const index = Math.max(0, anchor - PAST_MATCHES_ABOVE);
+    return flat[index]!.id;
+  }, [groups]);
+
+  useEffect(() => {
+    if (isLoading || !hydrated || !scrollTargetId) return;
+    const behavior: ScrollBehavior = lastScrollTarget.current === null ? "auto" : "smooth";
+    lastScrollTarget.current = scrollTargetId;
+    const raf = requestAnimationFrame(() => {
+      const el = document.getElementById(`match-${scrollTargetId}`);
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY - SCROLL_OFFSET;
+      window.scrollTo({ top: Math.max(0, top), behavior });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [scrollTargetId, isLoading, hydrated]);
+
+
 
   return (
     <main className="px-4 pt-5">

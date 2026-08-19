@@ -35,6 +35,7 @@ export function MatchCard({ match }: { match: MatchCardData }) {
 
   return (
     <Link
+      id={`match-${match.id}`}
       to="/match/$id"
       params={{ id: match.id }}
       className="block rounded-2xl bg-card p-4 shadow-card transition-colors hover:bg-surface-2"
