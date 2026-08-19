@@ -29,7 +29,7 @@ export type Competition = {
 
 function chipClasses(active: boolean, hasMatches: boolean, dragging: boolean) {
   return cn(
-    "shrink-0 select-none rounded-2xl px-3 py-1.5 text-xs font-medium transition-[background-color,color,transform,box-shadow] duration-200 touch-none",
+    "shrink-0 select-none rounded-2xl px-3 py-1.5 text-xs font-medium transition-[background-color,color,transform,box-shadow] duration-200",
     active ? "bg-brand-gradient text-brand-foreground" : "bg-surface text-muted-foreground",
     !hasMatches && "opacity-40",
     dragging && "opacity-0",
@@ -53,7 +53,11 @@ function SortableChip({
     <button
       ref={setNodeRef}
       type="button"
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        touchAction: "auto",
+      }}
       onClick={() => onSelect(competition.id)}
       className={chipClasses(active, competition.hasMatches, isDragging)}
       {...attributes}
