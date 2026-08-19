@@ -68,7 +68,7 @@ export function MatchCard({ match }: { match: MatchCardData }) {
             </LtrNum>
           ) : isFuture && match.date ? (
             <div className="flex flex-col items-center gap-0.5">
-              <LtrNum className="text-[11px] text-muted-foreground">{match.date}</LtrNum>
+              <LtrNum className="text-[13px] font-medium text-foreground">{match.date}</LtrNum>
               {match.kickoffTime ? (
                 <LtrNum className="text-sm font-medium text-muted-foreground">{match.kickoffTime}</LtrNum>
               ) : (
