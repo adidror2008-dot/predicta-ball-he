@@ -127,18 +127,6 @@ function MatchesScreen() {
     if (saved) setActiveId(saved);
   }, []);
 
-  useEffect(() => {
-    if (isLoading || restored.current) return;
-    restored.current = true;
-    const y = Number(sessionStorage.getItem(SCROLL_KEY) ?? 0);
-    if (y > 0) window.scrollTo(0, y);
-  }, [isLoading]);
-
-  useEffect(() => {
-    const onScroll = () => sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
 
   const selectCompetition = (id: string) => {
     const next = activeId === id ? null : id;
