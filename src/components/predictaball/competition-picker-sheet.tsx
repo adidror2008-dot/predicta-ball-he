@@ -134,10 +134,13 @@ export function CompetitionPickerSheet({
                 >
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium">{c.name}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {country ?? "—"}
-                      {!c.hasMatches ? " · אין משחקים כרגע" : ""}
-                    </span>
+                    {country || !c.hasMatches ? (
+                      <span className="block text-xs text-muted-foreground">
+                        {[country, c.hasMatches ? null : "אין משחקים כרגע"]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    ) : null}
                   </span>
                   <span
                     className={cn(
