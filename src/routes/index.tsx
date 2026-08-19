@@ -37,8 +37,9 @@ export const Route = createFileRoute("/")({
 });
 
 const TAB_KEY = "pb:matches:activeCompetition";
-const SCROLL_KEY = "pb:matches:scrollY";
 const OTHER = "__other__";
+const SCROLL_OFFSET = 12;
+const PAST_MATCHES_ABOVE = 2;
 
 function toStatus(status: string | null): MatchStatus {
   if (status === "finished" || status === "ended" || status === "afterET" || status === "ap") {
