@@ -7,9 +7,16 @@ import {
   CompetitionChips,
   type Competition,
 } from "@/components/predictaball/competition-chips";
+import {
+  CompetitionPickerSheet,
+  type PickerCompetition,
+} from "@/components/predictaball/competition-picker-sheet";
 import { MatchCard, type MatchCardData, type MatchStatus } from "@/components/predictaball/match-card";
 import { EmptyState, SkeletonBlock } from "@/components/predictaball/ui-bits";
 import { getMatchesListFn } from "@/lib/matches-list.functions";
+import { getCompetitionsListFn } from "@/lib/competitions-list.functions";
+import { applyOrder, useChipPrefs } from "@/lib/chip-prefs";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
