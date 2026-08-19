@@ -174,6 +174,32 @@ function MatchesScreen() {
     return ordered;
   }, [matches, activeId, selectedSet, prefs.order]);
 
+  // The list opens on the nearest upcoming (or live) match, keeping two
+  // finished matches visible above it as a time anchor.
+  const scrollTargetId = useMemo(() => {
+    const flat = groups.flatMap((g) => g.matches);
+    if (flat.length === 0) return null;
+    const anchor = flat.findIndex((m) => m.status !== "finished");
+    if (anchor < 0) return flat[flat.length - 1]!.id;
+    const index = Math.max(0, anchor - PAST_MATCHES_ABOVE);
+    return flat[index]!.id;
+  }, [groups]);
+
+  useEffect(() => {
+    if (isLoading || !hydrated || !scrollTargetId) return;
+    const behavior: ScrollBehavior = lastScrollTarget.current === null ? "auto" : "smooth";
+    lastScrollTarget.current = scrollTargetId;
+    const raf = requestAnimationFrame(() => {
+      const el = document.getElementById(`match-${scrollTargetId}`);
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY - SCROLL_OFFSET;
+      window.scrollTo({ top: Math.max(0, top), behavior });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [scrollTargetId, isLoading, hydrated]);
+
+
+
   return (
     <main className="px-4 pt-5">
       <header className="mb-4 flex items-center justify-between gap-3">
