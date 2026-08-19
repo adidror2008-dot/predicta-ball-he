@@ -62,25 +62,64 @@ function formatTime(iso: string) {
 
 function MatchesScreen() {
   const fetchMatches = useServerFn(getMatchesListFn);
+  const fetchCompetitions = useServerFn(getCompetitionsListFn);
+
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["matches-list"],
     queryFn: () => fetchMatches(),
   });
+  const { data: allCompetitions, isLoading: isLoadingCompetitions } = useQuery({
+    queryKey: ["competitions-list"],
+    queryFn: () => fetchCompetitions(),
+  });
 
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const restored = useRef(false);
+  const { prefs, hydrated, update } = useChipPrefs();
 
   const matches = useMemo(() => data ?? [], [data]);
 
-  const competitions = useMemo<Competition[]>(() => {
-    const map = new Map<string, string>();
-    for (const m of matches) {
-      const id = m.competitionId ?? OTHER;
-      const name = m.competitionName ?? "משחקים נוספים";
-      if (!map.has(id)) map.set(id, name);
+  const withMatches = useMemo(
+    () => new Set(matches.map((m) => m.competitionId ?? OTHER)),
+    [matches],
+  );
+
+  const pickerCompetitions = useMemo<PickerCompetition[]>(() => {
+    const base = (allCompetitions ?? []).map((c) => ({
+      id: c.id,
+      name: c.name,
+      nameEn: c.nameEn,
+      country: c.country,
+      hasMatches: withMatches.has(c.id),
+    }));
+    if (withMatches.has(OTHER)) {
+      base.push({
+        id: OTHER,
+        name: "משחקים נוספים",
+        nameEn: null,
+        country: null,
+        hasMatches: true,
+      });
     }
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name, hasMatches: true }));
-  }, [matches]);
+    return base;
+  }, [allCompetitions, withMatches]);
+
+  const allIds = useMemo(() => pickerCompetitions.map((c) => c.id), [pickerCompetitions]);
+  const selectedIds = useMemo(
+    () => (prefs.selected === null ? allIds : prefs.selected.filter((id) => allIds.includes(id))),
+    [prefs.selected, allIds],
+  );
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+
+  const competitions = useMemo<Competition[]>(
+    () =>
+      applyOrder(
+        pickerCompetitions.filter((c) => selectedSet.has(c.id)),
+        prefs.order,
+      ).map((c) => ({ id: c.id, name: c.name, hasMatches: c.hasMatches })),
+    [pickerCompetitions, selectedSet, prefs.order],
+  );
 
   useEffect(() => {
     const saved = sessionStorage.getItem(TAB_KEY);
@@ -107,10 +146,19 @@ function MatchesScreen() {
     else sessionStorage.removeItem(TAB_KEY);
   };
 
+  const toggleCompetition = (id: string) => {
+    const next = selectedSet.has(id)
+      ? selectedIds.filter((v) => v !== id)
+      : [...selectedIds, id];
+    update({ ...prefs, selected: next });
+    if (activeId === id && !next.includes(id)) setActiveId(null);
+  };
+
   const groups = useMemo(() => {
+    const visible = matches.filter((m) => selectedSet.has(m.competitionId ?? OTHER));
     const filtered = activeId
-      ? matches.filter((m) => (m.competitionId ?? OTHER) === activeId)
-      : matches;
+      ? visible.filter((m) => (m.competitionId ?? OTHER) === activeId)
+      : visible;
 
     const byComp = new Map<string, { name: string; matches: MatchCardData[] }>();
     for (const m of filtered) {
@@ -130,8 +178,12 @@ function MatchesScreen() {
         status: toStatus(m.status),
       });
     }
-    return Array.from(byComp.entries()).map(([id, g]) => ({ id, ...g }));
-  }, [matches, activeId]);
+    const ordered = applyOrder(
+      Array.from(byComp.entries()).map(([id, g]) => ({ id, ...g })),
+      prefs.order,
+    );
+    return ordered;
+  }, [matches, activeId, selectedSet, prefs.order]);
 
   return (
     <main className="px-4 pt-5">
@@ -154,15 +206,33 @@ function MatchesScreen() {
         competitions={competitions}
         activeId={activeId}
         onSelect={selectCompetition}
+        onReorder={(ids) => update({ ...prefs, order: ids })}
+        onOpenPicker={() => setPickerOpen(true)}
+      />
+
+      <CompetitionPickerSheet
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        competitions={pickerCompetitions}
+        isLoading={isLoadingCompetitions}
+        selectedIds={selectedIds}
+        onToggle={toggleCompetition}
+        onSelectAll={() => update({ ...prefs, selected: null })}
+        onClearAll={() => {
+          update({ ...prefs, selected: [] });
+          setActiveId(null);
+        }}
       />
 
       <section className="mt-4 space-y-5">
-        {isLoading ? (
+        {isLoading || !hydrated ? (
           <>
             <SkeletonBlock className="h-24" />
             <SkeletonBlock className="h-24" />
             <SkeletonBlock className="h-24" />
           </>
+        ) : selectedIds.length === 0 ? (
+          <EmptyState text="לא נבחרו תחרויות להצגה. פתחו את תפריט התחרויות ובחרו אילו יופיעו." />
         ) : groups.length === 0 ? (
           <EmptyState text="אין משחקים להצגה כרגע" />
         ) : (
@@ -180,4 +250,5 @@ function MatchesScreen() {
       </section>
     </main>
   );
+
 }
