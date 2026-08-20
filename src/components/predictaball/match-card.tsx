@@ -46,10 +46,11 @@ export function MatchCard({ match }: { match: MatchCardData }) {
       <div className="flex items-center justify-between gap-3">
         <span
           className={cn(
-            "rounded-full px-2.5 py-1 text-[11px] font-medium",
+            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium",
             statusClass[match.status],
           )}
         >
+          {match.status === "live" ? <BallIcon spin /> : null}
           {statusLabel[match.status]}
         </span>
         {!isFuture && match.date ? (
