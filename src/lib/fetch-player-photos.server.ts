@@ -101,17 +101,23 @@ export async function runFetchPlayerPhotos(
   if (startingById.size === 0) return finish("skipped", "no lineup players in window");
 
   const playerIds = [...startingById.keys()];
-  const { data: players, error: playersError } = await supabaseAdmin
-    .from("players")
-    .select("id, external_id, photo_checked_at")
-    .in("id", playerIds)
-    .eq("source", SOURCE)
-    .is("photo_url", null)
-    .not("external_id", "is", null)
-    .or(`photo_checked_at.is.null,photo_checked_at.lt.${staleBefore}`);
-  if (playersError) return finish("failed", playersError.message);
+  type Candidate = { id: string; external_id: string | null };
+  const players: Candidate[] = [];
+  const CHUNK = 200;
+  for (let i = 0; i < playerIds.length; i += CHUNK) {
+    const { data: chunk, error: playersError } = await supabaseAdmin
+      .from("players")
+      .select("id, external_id")
+      .in("id", playerIds.slice(i, i + CHUNK))
+      .eq("source", SOURCE)
+      .is("photo_url", null)
+      .not("external_id", "is", null)
+      .or(`photo_checked_at.is.null,photo_checked_at.lt.${staleBefore}`);
+    if (playersError) return finish("failed", playersError.message);
+    players.push(...(chunk ?? []));
+  }
 
-  const queue = (players ?? [])
+  const queue = players
     .sort((a, b) => {
       const as = startingById.get(a.id) === true ? 0 : 1;
       const bs = startingById.get(b.id) === true ? 0 : 1;
