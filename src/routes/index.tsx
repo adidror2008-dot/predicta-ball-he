@@ -102,6 +102,7 @@ function MatchesPanel({
     kickoffTime: formatTime(m.kickoffAt),
     date: formatDate(m.kickoffAt),
     status: toStatus(m.status),
+    minute: m.minute ?? null,
   });
 
   const { finished, upcoming } = useMemo(() => {
