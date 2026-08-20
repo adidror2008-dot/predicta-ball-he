@@ -197,7 +197,7 @@ export function SwipeDeck({
           <div
             aria-hidden
             className="pointer-events-none absolute inset-y-0 w-full"
-            style={{ transform: `translate3d(calc(100% + ${gap}px), 0, 0)`, insetInlineStart: 0 }}
+            style={{ transform: `translate3d(calc(-100% - ${gap}px), 0, 0)`, insetInlineStart: 0 }}
           >
             {children(index - 1)}
           </div>
@@ -207,7 +207,7 @@ export function SwipeDeck({
           <div
             aria-hidden
             className="pointer-events-none absolute inset-y-0 w-full"
-            style={{ transform: `translate3d(calc(-100% - ${gap}px), 0, 0)`, insetInlineStart: 0 }}
+            style={{ transform: `translate3d(calc(100% + ${gap}px), 0, 0)`, insetInlineStart: 0 }}
           >
             {children(index + 1)}
           </div>
