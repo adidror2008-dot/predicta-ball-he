@@ -99,7 +99,7 @@ function PlayerChip({ player, onPitch }: { player: LineupPlayer; onPitch?: boole
           </span>
         ) : null}
 
-        {player.shirt_number !== null ? (
+        {player.photoUrl && player.shirt_number !== null ? (
           <span
             className="absolute -top-1 flex size-4 items-center justify-center rounded-full border border-border bg-surface text-[8px] font-bold text-foreground"
             style={{ left: "-4px" }}
