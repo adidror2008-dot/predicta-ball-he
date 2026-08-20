@@ -59,27 +59,137 @@ function formatTime(iso: string) {
   return `${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-function MatchesScreen() {
+function MatchesPanel({
+  competitionId,
+  active,
+  hydrated,
+  onFetchingChange,
+  refreshToken,
+}: {
+  competitionId: string;
+  active: boolean;
+  hydrated: boolean;
+  onFetchingChange?: (fetching: boolean) => void;
+  refreshToken?: number;
+}) {
   const fetchMatches = useServerFn(getMatchesListFn);
+  const lastScrollTarget = useRef<string | null>(null);
+
+  const { data, isLoading, isFetching, refetch } = useQuery({
+    queryKey: ["matches-list", competitionId],
+    queryFn: () => fetchMatches({ data: { competitionIds: [competitionId] } }),
+  });
+
+  useEffect(() => {
+    if (active && refreshToken) refetch();
+  }, [refreshToken, active, refetch]);
+
+  useEffect(() => {
+    if (active) onFetchingChange?.(isFetching);
+  }, [isFetching, active, onFetchingChange]);
+
+  const matches = useMemo(() => data ?? [], [data]);
+
+  const toCard = (m: (typeof matches)[number]): MatchCardData => ({
+    id: m.id,
+    homeName: m.homeName,
+    awayName: m.awayName,
+    homeLogo: m.homeLogo,
+    awayLogo: m.awayLogo,
+    homeScore: m.homeScore,
+    awayScore: m.awayScore,
+    kickoffTime: formatTime(m.kickoffAt),
+    date: formatDate(m.kickoffAt),
+    status: toStatus(m.status),
+  });
+
+  const { finished, upcoming } = useMemo(() => {
+    const sorted = [...matches].sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt));
+    return {
+      finished: sorted.filter((m) => toStatus(m.status) === "finished").map(toCard),
+      upcoming: sorted.filter((m) => toStatus(m.status) !== "finished").map(toCard),
+    };
+  }, [matches]);
+
+  const seasonNotice = useMemo(() => {
+    const first = matches.find((m) => !m.isCurrentSeason && m.seasonLabel);
+    return first?.seasonLabel ?? null;
+  }, [matches]);
+
+  // The list opens on the divider, keeping two finished matches visible above.
+  const scrollTargetId = useMemo(() => {
+    if (finished.length === 0) return upcoming[0]?.id ?? null;
+    const index = Math.max(0, finished.length - PAST_MATCHES_ABOVE);
+    return finished[index]?.id ?? finished[finished.length - 1]!.id;
+  }, [finished, upcoming]);
+
+  useEffect(() => {
+    if (!active || isLoading || !hydrated || !scrollTargetId) return;
+    const behavior: ScrollBehavior = lastScrollTarget.current === null ? "auto" : "smooth";
+    lastScrollTarget.current = scrollTargetId;
+    const raf = requestAnimationFrame(() => {
+      const el = document.getElementById(`match-${scrollTargetId}`);
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY - SCROLL_OFFSET;
+      window.scrollTo({ top: Math.max(0, top), behavior });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [scrollTargetId, isLoading, hydrated, active]);
+
+  if (!hydrated || isLoading) {
+    return (
+      <div className="space-y-3">
+        <SkeletonBlock className="h-24" />
+        <SkeletonBlock className="h-24" />
+        <SkeletonBlock className="h-24" />
+      </div>
+    );
+  }
+
+  if (finished.length === 0 && upcoming.length === 0) {
+    return <EmptyState text="אין משחקים להצגה כרגע" />;
+  }
+
+  return (
+    <div className="space-y-3">
+      {seasonNotice ? (
+        <p className="text-xs text-muted-foreground">
+          עונת <span dir="ltr">{seasonNotice}</span>
+        </p>
+      ) : null}
+
+      {finished.map((m) => (
+        <MatchCard key={m.id} match={m} />
+      ))}
+
+      {upcoming.length > 0 ? (
+        <div className="flex items-center gap-3 py-1">
+          <span className="h-px flex-1 bg-border" aria-hidden />
+          <span className="text-xs font-medium text-muted-foreground">משחקים קרובים</span>
+          <span className="h-px flex-1 bg-border" aria-hidden />
+        </div>
+      ) : null}
+
+      {upcoming.map((m) => (
+        <MatchCard key={m.id} match={m} />
+      ))}
+    </div>
+  );
+}
+
+function MatchesScreen() {
   const fetchCompetitions = useServerFn(getCompetitionsListFn);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const lastScrollTarget = useRef<string | null>(null);
+  const [isFetching, setIsFetching] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
   const { prefs, hydrated, update } = useChipPrefs();
 
   const { data: allCompetitions, isLoading: isLoadingCompetitions } = useQuery({
     queryKey: ["competitions-list"],
     queryFn: () => fetchCompetitions(),
   });
-
-  const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["matches-list", activeId],
-    queryFn: () => fetchMatches({ data: { competitionIds: [activeId!] } }),
-    enabled: !!activeId,
-  });
-
-  const matches = useMemo(() => data ?? [], [data]);
 
   const pickerCompetitions = useMemo<PickerCompetition[]>(
     () =>
@@ -137,53 +247,12 @@ function MatchesScreen() {
     update({ ...prefs, selected: next });
   };
 
-  const toCard = (m: (typeof matches)[number]): MatchCardData => ({
-    id: m.id,
-    homeName: m.homeName,
-    awayName: m.awayName,
-    homeLogo: m.homeLogo,
-    awayLogo: m.awayLogo,
-    homeScore: m.homeScore,
-    awayScore: m.awayScore,
-    kickoffTime: formatTime(m.kickoffAt),
-    date: formatDate(m.kickoffAt),
-    status: toStatus(m.status),
-  });
+  const activeIndex = Math.max(
+    0,
+    competitions.findIndex((c) => c.id === activeId),
+  );
 
-  const { finished, upcoming } = useMemo(() => {
-    const sorted = [...matches].sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt));
-    return {
-      finished: sorted.filter((m) => toStatus(m.status) === "finished").map(toCard),
-      upcoming: sorted.filter((m) => toStatus(m.status) !== "finished").map(toCard),
-    };
-  }, [matches]);
-
-  const seasonNotice = useMemo(() => {
-    const first = matches.find((m) => !m.isCurrentSeason && m.seasonLabel);
-    return first?.seasonLabel ?? null;
-  }, [matches]);
-
-  // The list opens on the divider, keeping two finished matches visible above.
-  const scrollTargetId = useMemo(() => {
-    if (finished.length === 0) return upcoming[0]?.id ?? null;
-    const index = Math.max(0, finished.length - PAST_MATCHES_ABOVE);
-    return finished[index]?.id ?? finished[finished.length - 1]!.id;
-  }, [finished, upcoming]);
-
-  useEffect(() => {
-    if (isLoading || !hydrated || !scrollTargetId) return;
-    const behavior: ScrollBehavior = lastScrollTarget.current === null ? "auto" : "smooth";
-    lastScrollTarget.current = scrollTargetId;
-    const raf = requestAnimationFrame(() => {
-      const el = document.getElementById(`match-${scrollTargetId}`);
-      if (!el) return;
-      const top = el.getBoundingClientRect().top + window.scrollY - SCROLL_OFFSET;
-      window.scrollTo({ top: Math.max(0, top), behavior });
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [scrollTargetId, isLoading, hydrated]);
-
-  const showSkeleton = !hydrated || isLoadingCompetitions || (!!activeId && isLoading);
+  const showSkeleton = !hydrated || isLoadingCompetitions;
 
   return (
     <main className="px-4 pt-5">
@@ -195,7 +264,7 @@ function MatchesScreen() {
         <button
           type="button"
           aria-label="רענון"
-          onClick={() => refetch()}
+          onClick={() => setRefreshToken((v) => v + 1)}
           className="rounded-2xl bg-surface p-2.5 text-muted-foreground transition-colors active:bg-surface-2"
         >
           <RotateCw className={isFetching ? "size-4 animate-spin" : "size-4"} aria-hidden />
@@ -221,43 +290,41 @@ function MatchesScreen() {
         onClearAll={() => update({ ...prefs, selected: [] })}
       />
 
-      <section className="mt-4 space-y-3">
+      <section className="mt-4">
         {showSkeleton ? (
-          <>
+          <div className="space-y-3">
             <SkeletonBlock className="h-24" />
             <SkeletonBlock className="h-24" />
             <SkeletonBlock className="h-24" />
-          </>
+          </div>
         ) : selectedIds.length === 0 || !activeId ? (
           <EmptyState text="לא נבחרו תחרויות להצגה. פתחו את תפריט התחרויות ובחרו אילו יופיעו." />
-        ) : finished.length === 0 && upcoming.length === 0 ? (
-          <EmptyState text="אין משחקים להצגה כרגע" />
         ) : (
-          <>
-            {seasonNotice ? (
-              <p className="text-xs text-muted-foreground">
-                עונת <span dir="ltr">{seasonNotice}</span>
-              </p>
-            ) : null}
-
-            {finished.map((m) => (
-              <MatchCard key={m.id} match={m} />
-            ))}
-
-            {upcoming.length > 0 ? (
-              <div className="flex items-center gap-3 py-1">
-                <span className="h-px flex-1 bg-border" aria-hidden />
-                <span className="text-xs font-medium text-muted-foreground">משחקים קרובים</span>
-                <span className="h-px flex-1 bg-border" aria-hidden />
-              </div>
-            ) : null}
-
-            {upcoming.map((m) => (
-              <MatchCard key={m.id} match={m} />
-            ))}
-          </>
+          <SwipeDeck
+            index={activeIndex}
+            count={competitions.length}
+            onIndexChange={(next) => {
+              const target = competitions[next];
+              if (target) selectCompetition(target.id);
+            }}
+          >
+            {(i) => {
+              const comp = competitions[i];
+              if (!comp) return null;
+              return (
+                <MatchesPanel
+                  competitionId={comp.id}
+                  active={comp.id === activeId}
+                  hydrated={hydrated}
+                  onFetchingChange={setIsFetching}
+                  refreshToken={refreshToken}
+                />
+              );
+            }}
+          </SwipeDeck>
         )}
       </section>
     </main>
   );
 }
+
