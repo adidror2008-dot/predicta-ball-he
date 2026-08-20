@@ -28,7 +28,7 @@ const statusLabel: Record<MatchStatus, string> = {
 
 const statusClass: Record<MatchStatus, string> = {
   scheduled: "bg-surface-2 text-muted-foreground",
-  live: "bg-status-win/15 text-status-win",
+  live: "bg-status-loss/15 text-status-loss",
   finished: "bg-status-draw/20 text-muted-foreground",
 };
 
