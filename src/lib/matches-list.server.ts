@@ -235,6 +235,7 @@ export async function getMatchesList(input: MatchesListInput = {}): Promise<Matc
       isCurrentSeason: singleCompetitionId
         ? forcedSeasonIsCurrent
         : !seasonLabel || !currentSeason || seasonLabel === currentSeason,
+      minute: m.minute ?? null,
     });
   }
 
