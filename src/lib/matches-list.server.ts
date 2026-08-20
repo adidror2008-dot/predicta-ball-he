@@ -4,7 +4,7 @@ const LOGO_BUCKET = "team-logos";
 const LOGO_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7;
 const DEFAULT_PAST_DAYS = 7;
 const DEFAULT_FUTURE_DAYS = 30;
-const DEFAULT_LIMIT = 300;
+const DEFAULT_LIMIT = 600;
 const MAX_LIMIT = 1000;
 
 export type MatchesListInput = {
@@ -36,15 +36,61 @@ export type MatchListItem = {
   stage: string | null;
   leg: number | null;
   tieKey: string | null;
+  seasonLabel: string | null;
+  isCurrentSeason: boolean;
 };
 
 type TeamRow = { id: string; name_he: string | null; name_en: string | null; logo_url: string | null };
 
 export async function getMatchesList(input: MatchesListInput = {}): Promise<MatchListItem[]> {
   const now = Date.now();
+  const limit = Math.max(1, Math.min(Number(input.limit ?? DEFAULT_LIMIT), MAX_LIMIT));
+  const singleCompetitionId =
+    input.competitionIds && input.competitionIds.length === 1 ? input.competitionIds[0]! : null;
+  // A single competition shows its whole season: no date bounds unless the
+  // caller explicitly passed them.
+  const boundless = singleCompetitionId !== null && !input.from && !input.to;
   const from = input.from ?? new Date(now - DEFAULT_PAST_DAYS * 86400000).toISOString();
   const to = input.to ?? new Date(now + DEFAULT_FUTURE_DAYS * 86400000).toISOString();
-  const limit = Math.max(1, Math.min(Number(input.limit ?? DEFAULT_LIMIT), MAX_LIMIT));
+
+  // Season resolution for the single-competition path: prefer the current
+  // season, fall back to the latest season that actually has matches.
+  let forcedSeason: string | null = null;
+  let forcedSeasonIsCurrent = true;
+  if (singleCompetitionId) {
+    const { data: comp } = await supabaseAdmin
+      .from("competitions")
+      .select("season_calc_method")
+      .eq("id", singleCompetitionId)
+      .maybeSingle();
+    const { data: currentSeason } = await supabaseAdmin.rpc("compute_season", {
+      kickoff: new Date().toISOString(),
+      method: comp?.season_calc_method ?? "aug_may",
+    });
+    forcedSeason = (currentSeason as string | null) ?? null;
+
+    if (forcedSeason) {
+      const { count } = await supabaseAdmin
+        .from("matches")
+        .select("id", { count: "exact", head: true })
+        .eq("competition_id", singleCompetitionId)
+        .eq("season", forcedSeason);
+      if (!count) {
+        const { data: latest } = await supabaseAdmin
+          .from("matches")
+          .select("season")
+          .eq("competition_id", singleCompetitionId)
+          .not("season", "is", null)
+          .order("season", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (latest?.season) {
+          forcedSeason = latest.season;
+          forcedSeasonIsCurrent = false;
+        }
+      }
+    }
+  }
 
   let query = supabaseAdmin
     .from("matches")
@@ -54,13 +100,18 @@ export async function getMatchesList(input: MatchesListInput = {}): Promise<Matc
     .not("home_team_id", "is", null)
     .not("away_team_id", "is", null)
     .not("kickoff_at", "is", null)
-    .gte("kickoff_at", from)
-    .lte("kickoff_at", to)
     .order("kickoff_at", { ascending: true })
     .limit(limit);
 
+  if (!boundless) {
+    query = query.gte("kickoff_at", from).lte("kickoff_at", to);
+  }
+
   if (input.competitionIds && input.competitionIds.length > 0) {
     query = query.in("competition_id", input.competitionIds);
+  }
+  if (singleCompetitionId && forcedSeason) {
+    query = query.eq("season", forcedSeason);
   }
 
   const { data: matches, error } = await query;
@@ -144,11 +195,18 @@ export async function getMatchesList(input: MatchesListInput = {}): Promise<Matc
     // Golden rule: no real data -> not displayed.
     if (!homeName || !awayName || !m.kickoff_at) continue;
 
-    // Only the current season of each competition is presented.
-    const expectedSeason = m.competition_id
-      ? currentSeasonByCompetition.get(m.competition_id)
-      : null;
+    // Only the resolved season of each competition is presented.
+    const expectedSeason = singleCompetitionId
+      ? forcedSeason
+      : m.competition_id
+        ? currentSeasonByCompetition.get(m.competition_id)
+        : null;
     if (expectedSeason && m.season && m.season !== expectedSeason) continue;
+
+    const currentSeason = m.competition_id
+      ? (currentSeasonByCompetition.get(m.competition_id) ?? null)
+      : null;
+    const seasonLabel = m.season ?? expectedSeason ?? null;
 
     items.push({
       id: m.id,
@@ -172,6 +230,10 @@ export async function getMatchesList(input: MatchesListInput = {}): Promise<Matc
       stage: m.stage,
       leg: m.leg,
       tieKey: m.tie_key,
+      seasonLabel,
+      isCurrentSeason: singleCompetitionId
+        ? forcedSeasonIsCurrent
+        : !seasonLabel || !currentSeason || seasonLabel === currentSeason,
     });
   }
 
