@@ -96,7 +96,7 @@ export async function getMatchesList(input: MatchesListInput = {}): Promise<Matc
   let query = supabaseAdmin
     .from("matches")
     .select(
-      "id, external_id, competition_id, home_team_id, away_team_id, home_score, away_score, kickoff_at, status, source, season, time_confirmed, venue, round_name, round_number, is_qualifier, stage, leg, tie_key",
+      "id, external_id, competition_id, home_team_id, away_team_id, home_score, away_score, kickoff_at, status, source, season, time_confirmed, venue, round_name, round_number, is_qualifier, stage, leg, tie_key, minute",
     )
     .not("home_team_id", "is", null)
     .not("away_team_id", "is", null)
