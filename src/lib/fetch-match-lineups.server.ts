@@ -13,6 +13,7 @@ export type FetchMatchLineupsResult = {
   confirmed: boolean | null;
   players_upserted: number;
   lineups_upserted: number;
+  ratings_upserted: number;
   budget_exhausted: boolean;
   message?: string;
   job_run_error?: string;
@@ -36,6 +37,7 @@ export async function runFetchMatchLineups(data: {
   let confirmed: boolean | null = null;
   let playersUpserted = 0;
   let lineupsUpserted = 0;
+  let ratingsUpserted = 0;
   let budgetExhausted = false;
 
   // Writes exactly ONE job_runs row at the end of the run.
@@ -57,6 +59,7 @@ export async function runFetchMatchLineups(data: {
         confirmed,
         players_upserted: playersUpserted,
         lineups_upserted: lineupsUpserted,
+        ratings_upserted: ratingsUpserted,
         budget_exhausted: budgetExhausted,
       } as never,
       error: error ?? null,
@@ -84,6 +87,7 @@ export async function runFetchMatchLineups(data: {
       confirmed,
       players_upserted: playersUpserted,
       lineups_upserted: lineupsUpserted,
+      ratings_upserted: ratingsUpserted,
       budget_exhausted: budgetExhausted,
       ...(message ? { message } : {}),
       ...(jobRunError ? { job_run_error: jobRunError } : {}),
@@ -161,15 +165,24 @@ export async function runFetchMatchLineups(data: {
     team_id: string | null;
     is_starting: boolean;
     formation: string | null;
+    sort_order: number;
+    rating: number | null;
   };
   const drafts: Draft[] = [];
 
   for (const { key, side } of sides) {
     const formation = side["formation"] != null ? String(side["formation"]) : null;
     const fallbackTeamId = key === "home" ? match.home_team_id : match.away_team_id;
-    for (const entry of (side["players"] as AnyRec[] | undefined) ?? []) {
+    const sidePlayers = (side["players"] as AnyRec[] | undefined) ?? [];
+    for (let idx = 0; idx < sidePlayers.length; idx += 1) {
+      const entry = sidePlayers[idx] as AnyRec;
       const p = (entry["player"] ?? {}) as AnyRec;
       if (p["id"] == null) continue;
+      const rawRating = (entry["statistics"] as AnyRec | undefined)?.["rating"];
+      const rating =
+        rawRating === null || rawRating === undefined || Number.isNaN(Number(rawRating))
+          ? null
+          : Number(rawRating);
       const teamExternalId = entry["teamId"] != null ? String(entry["teamId"]) : null;
       const teamId =
         (teamExternalId ? teamMap.get(teamExternalId) : undefined) ?? fallbackTeamId ?? null;
@@ -182,6 +195,8 @@ export async function runFetchMatchLineups(data: {
         team_id: teamId,
         is_starting: entry["substitute"] !== true,
         formation,
+        sort_order: idx,
+        rating,
       });
     }
   }
@@ -226,6 +241,7 @@ export async function runFetchMatchLineups(data: {
         position: d.position,
         shirt_number: d.shirt_number,
         formation: d.formation,
+        sort_order: d.sort_order,
         fetched_at: now,
       };
     })
@@ -237,6 +253,24 @@ export async function runFetchMatchLineups(data: {
       .upsert(lineupRows, { onConflict: "match_id,player_id" });
     if (lineupsError) return finish("partial", `lineups: ${lineupsError.message}`);
     lineupsUpserted = lineupRows.length;
+  }
+
+  const ratingRows = drafts
+    .filter((d) => d.rating !== null && playerMap.has(d.external_id))
+    .map((d) => ({
+      match_id: matchId as string,
+      player_id: playerMap.get(d.external_id) as string,
+      rating: d.rating as number,
+      source: SOURCE,
+      fetched_at: now,
+    }));
+
+  if (ratingRows.length > 0) {
+    const { error: ratingsError } = await supabaseAdmin
+      .from("player_ratings")
+      .upsert(ratingRows, { onConflict: "match_id,player_id,source" });
+    if (ratingsError) return finish("partial", `ratings: ${ratingsError.message}`);
+    ratingsUpserted = ratingRows.length;
   }
 
   if (lineupRows.length < drafts.length) {
