@@ -1,0 +1,10 @@
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
+const now=Date.now();
+const a=await supabaseAdmin.from("matches").select("id").gte("kickoff_at",new Date(now-3*864e5).toISOString()).lte("kickoff_at",new Date(now+7*864e5).toISOString());
+console.info("matches",a.error?.message, a.data?.length);
+const ids=(a.data??[]).map(m=>m.id);
+const b=await supabaseAdmin.from("lineups").select("player_id,is_starting").in("match_id",ids).not("player_id","is",null);
+console.info("lineups",b.error?.message,b.data?.length);
+const pid=[...new Set((b.data??[]).map(r=>r.player_id!))];
+const c=await supabaseAdmin.from("players").select("id,external_id").in("id",pid.slice(0,500)).eq("source","sofascore").is("photo_url",null).not("external_id","is",null).or(`photo_checked_at.is.null,photo_checked_at.lt.${new Date(now-30*864e5).toISOString()}`);
+console.info("players",c.error?.message,c.data?.length, pid.length);
