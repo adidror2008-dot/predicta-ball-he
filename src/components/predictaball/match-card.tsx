@@ -16,6 +16,7 @@ export type MatchCardData = {
   kickoffTime: string | null;
   date: string | null;
   status: MatchStatus;
+  minute?: number | null;
 };
 
 
