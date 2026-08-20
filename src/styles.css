@@ -49,6 +49,15 @@
   --color-status-draw: var(--status-draw);
   --color-status-loss: var(--status-loss);
 
+  --color-rating-elite: var(--rating-elite);
+  --color-rating-good: var(--rating-good);
+  --color-rating-avg: var(--rating-avg);
+  --color-rating-low: var(--rating-low);
+  --color-rating-bad: var(--rating-bad);
+  --color-rating-foreground: var(--rating-foreground);
+  --color-pitch-line: var(--pitch-line);
+  --color-name-backdrop: var(--name-backdrop);
+
   --shadow-card: 0 8px 24px -12px oklch(0 0 0 / 0.7);
 }
 
@@ -97,6 +106,17 @@
   --status-draw: #7b93a8;
   --status-loss: #e4484d;
 
+  --rating-elite: #16b866;
+  --rating-good: #2f86e0;
+  --rating-avg: #e6c229;
+  --rating-low: #ec8b1f;
+  --rating-bad: #e4484d;
+  --rating-foreground: #061422;
+  --pitch-line: #ffffff40;
+  --name-backdrop: #041a33cc;
+  --pitch-stripe-a: #12563a;
+  --pitch-stripe-b: #0f4a33;
+
   --gradient-brand: linear-gradient(135deg, var(--brand), var(--brand-2), var(--brand-3));
 }
 
@@ -108,6 +128,14 @@
   background-image: var(--gradient-brand);
   background-clip: text;
   color: transparent;
+}
+
+@utility bg-pitch-turf {
+  background-image: repeating-linear-gradient(
+    180deg,
+    var(--pitch-stripe-a) 0 8%,
+    var(--pitch-stripe-b) 8% 16%
+  );
 }
 
 @utility no-mirror {
