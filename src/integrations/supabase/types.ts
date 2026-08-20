@@ -383,6 +383,7 @@ export type Database = {
           player_id: string | null
           position: string | null
           shirt_number: number | null
+          sort_order: number | null
           team_id: string | null
         }
         Insert: {
@@ -395,6 +396,7 @@ export type Database = {
           player_id?: string | null
           position?: string | null
           shirt_number?: number | null
+          sort_order?: number | null
           team_id?: string | null
         }
         Update: {
@@ -407,6 +409,7 @@ export type Database = {
           player_id?: string | null
           position?: string | null
           shirt_number?: number | null
+          sort_order?: number | null
           team_id?: string | null
         }
         Relationships: [

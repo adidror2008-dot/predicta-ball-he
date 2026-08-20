@@ -66,6 +66,8 @@ export type LineupPlayer = {
   shirt_number: number | null;
   is_starting: boolean | null;
   rating: number | null;
+  sort_order: number | null;
+  photoUrl: string | null;
 };
 
 export type MatchLineupsResult = {
@@ -171,7 +173,7 @@ export async function getMatchLineups(
 
   const { data, error } = await supabaseAdmin
     .from("lineups")
-    .select("team_id, player_id, position, shirt_number, is_starting, formation")
+    .select("team_id, player_id, position, shirt_number, is_starting, formation, sort_order")
     .eq("match_id", match.id);
   if (error) throw new Error(error.message);
 
@@ -203,6 +205,40 @@ export async function getMatchLineups(
     }
   }
 
+  const photoById = new Map<string, string | null>();
+  if (playerIds.length > 0) {
+    const { data: photoRows } = await supabaseAdmin
+      .from("players")
+      .select("id, photo_url")
+      .in("id", playerIds)
+      .not("photo_url", "is", null);
+    const paths = (photoRows ?? [])
+      .map((p) => p.photo_url)
+      .filter((v): v is string => typeof v === "string" && !/^https?:\/\//i.test(v));
+    if (paths.length > 0) {
+      const { data: signed } = await supabaseAdmin.storage
+        .from(PHOTO_BUCKET)
+        .createSignedUrls(paths, SIGNED_URL_TTL_SECONDS);
+      const urlByPath = new Map<string, string>();
+      for (const s of signed ?? []) {
+        if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl);
+      }
+      for (const p of photoRows ?? []) {
+        if (typeof p.photo_url !== "string") continue;
+        photoById.set(
+          p.id,
+          /^https?:\/\//i.test(p.photo_url)
+            ? p.photo_url
+            : (urlByPath.get(p.photo_url) ?? null),
+        );
+      }
+    } else {
+      for (const p of photoRows ?? []) {
+        if (typeof p.photo_url === "string") photoById.set(p.id, p.photo_url);
+      }
+    }
+  }
+
   const toPlayer = (r: (typeof rows)[number]): LineupPlayer => ({
     player_id: r.player_id,
     name: r.player_id ? (nameById.get(r.player_id) ?? null) : null,
@@ -210,6 +246,8 @@ export async function getMatchLineups(
     shirt_number: r.shirt_number,
     is_starting: r.is_starting,
     rating: r.player_id ? (ratingById.get(r.player_id) ?? null) : null,
+    sort_order: r.sort_order,
+    photoUrl: r.player_id ? (photoById.get(r.player_id) ?? null) : null,
   });
 
   const bySide = (teamId: string | null) =>
@@ -217,6 +255,9 @@ export async function getMatchLineups(
       .filter((r) => r.team_id === teamId)
       .map(toPlayer)
       .sort((a, b) => {
+        const ao = a.sort_order ?? Number.MAX_SAFE_INTEGER;
+        const bo = b.sort_order ?? Number.MAX_SAFE_INTEGER;
+        if (ao !== bo) return ao - bo;
         if (a.is_starting !== b.is_starting) return a.is_starting ? -1 : 1;
         return (a.shirt_number ?? 999) - (b.shirt_number ?? 999);
       });
