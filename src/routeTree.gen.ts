@@ -14,6 +14,7 @@ import { Route as AccuracyRouteImport } from './routes/accuracy'
 import { Route as NewsRouteImport } from './routes/news'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as MatchIdRouteImport } from './routes/match.$id'
+import { Route as ApiCronRefreshRouteImport } from './routes/api/cron/refresh'
 import { Route as ApiPublicDiscoverSeasonsRouteImport } from './routes/api/public/discover-seasons'
 import { Route as ApiPublicFetchTeamHistoryRouteImport } from './routes/api/public/fetch-team-history'
 import { Route as ApiPublicSyncCompetitionsRouteImport } from './routes/api/public/sync-competitions'
@@ -44,6 +45,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const MatchIdRoute = MatchIdRouteImport.update({
   id: '/match/$id',
   path: '/match/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCronRefreshRoute = ApiCronRefreshRouteImport.update({
+  id: '/api/cron/refresh',
+  path: '/api/cron/refresh',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicDiscoverSeasonsRoute =
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/news': typeof NewsRoute
   '/settings': typeof SettingsRoute
   '/match/$id': typeof MatchIdRoute
+  '/api/cron/refresh': typeof ApiCronRefreshRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
   '/api/public/fetch-team-history': typeof ApiPublicFetchTeamHistoryRoute
   '/api/public/sync-competitions': typeof ApiPublicSyncCompetitionsRoute
@@ -101,6 +108,7 @@ export interface FileRoutesByTo {
   '/news': typeof NewsRoute
   '/settings': typeof SettingsRoute
   '/match/$id': typeof MatchIdRoute
+  '/api/cron/refresh': typeof ApiCronRefreshRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
   '/api/public/fetch-team-history': typeof ApiPublicFetchTeamHistoryRoute
   '/api/public/sync-competitions': typeof ApiPublicSyncCompetitionsRoute
@@ -115,6 +123,7 @@ export interface FileRoutesById {
   '/news': typeof NewsRoute
   '/settings': typeof SettingsRoute
   '/match/$id': typeof MatchIdRoute
+  '/api/cron/refresh': typeof ApiCronRefreshRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
   '/api/public/fetch-team-history': typeof ApiPublicFetchTeamHistoryRoute
   '/api/public/sync-competitions': typeof ApiPublicSyncCompetitionsRoute
@@ -130,6 +139,7 @@ export interface FileRouteTypes {
     | '/news'
     | '/settings'
     | '/match/$id'
+    | '/api/cron/refresh'
     | '/api/public/discover-seasons'
     | '/api/public/fetch-team-history'
     | '/api/public/sync-competitions'
@@ -143,6 +153,7 @@ export interface FileRouteTypes {
     | '/news'
     | '/settings'
     | '/match/$id'
+    | '/api/cron/refresh'
     | '/api/public/discover-seasons'
     | '/api/public/fetch-team-history'
     | '/api/public/sync-competitions'
@@ -156,6 +167,7 @@ export interface FileRouteTypes {
     | '/news'
     | '/settings'
     | '/match/$id'
+    | '/api/cron/refresh'
     | '/api/public/discover-seasons'
     | '/api/public/fetch-team-history'
     | '/api/public/sync-competitions'
@@ -170,6 +182,7 @@ export interface RootRouteChildren {
   NewsRoute: typeof NewsRoute
   SettingsRoute: typeof SettingsRoute
   MatchIdRoute: typeof MatchIdRoute
+  ApiCronRefreshRoute: typeof ApiCronRefreshRoute
   ApiPublicDiscoverSeasonsRoute: typeof ApiPublicDiscoverSeasonsRoute
   ApiPublicFetchTeamHistoryRoute: typeof ApiPublicFetchTeamHistoryRoute
   ApiPublicSyncCompetitionsRoute: typeof ApiPublicSyncCompetitionsRoute
@@ -213,6 +226,13 @@ declare module '@tanstack/react-router' {
       path: '/match/$id'
       fullPath: '/match/$id'
       preLoaderRoute: typeof MatchIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/cron/refresh': {
+      id: '/api/cron/refresh'
+      path: '/api/cron/refresh'
+      fullPath: '/api/cron/refresh'
+      preLoaderRoute: typeof ApiCronRefreshRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/discover-seasons': {
@@ -266,6 +286,7 @@ const rootRouteChildren: RootRouteChildren = {
   NewsRoute: NewsRoute,
   SettingsRoute: SettingsRoute,
   MatchIdRoute: MatchIdRoute,
+  ApiCronRefreshRoute: ApiCronRefreshRoute,
   ApiPublicDiscoverSeasonsRoute: ApiPublicDiscoverSeasonsRoute,
   ApiPublicFetchTeamHistoryRoute: ApiPublicFetchTeamHistoryRoute,
   ApiPublicSyncCompetitionsRoute: ApiPublicSyncCompetitionsRoute,
