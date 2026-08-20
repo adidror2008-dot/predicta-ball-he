@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { BallIcon } from "./ball-icon";
 import { LtrNum, LogoSlot } from "./ui-bits";
 import { cn } from "@/lib/utils";
 
