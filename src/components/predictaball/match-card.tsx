@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { BallIcon } from "./ball-icon";
 import { LtrNum, LogoSlot } from "./ui-bits";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +16,7 @@ export type MatchCardData = {
   kickoffTime: string | null;
   date: string | null;
   status: MatchStatus;
+  minute?: number | null;
 };
 
 
@@ -26,7 +28,7 @@ const statusLabel: Record<MatchStatus, string> = {
 
 const statusClass: Record<MatchStatus, string> = {
   scheduled: "bg-surface-2 text-muted-foreground",
-  live: "bg-status-win/15 text-status-win",
+  live: "bg-status-loss/15 text-status-loss",
   finished: "bg-status-draw/20 text-muted-foreground",
 };
 
@@ -44,10 +46,11 @@ export function MatchCard({ match }: { match: MatchCardData }) {
       <div className="flex items-center justify-between gap-3">
         <span
           className={cn(
-            "rounded-full px-2.5 py-1 text-[11px] font-medium",
+            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium",
             statusClass[match.status],
           )}
         >
+          {match.status === "live" ? <BallIcon spin /> : null}
           {statusLabel[match.status]}
         </span>
         {!isFuture && match.date ? (
@@ -63,9 +66,16 @@ export function MatchCard({ match }: { match: MatchCardData }) {
 
         <div className="w-14 shrink-0 text-center">
           {hasScore ? (
-            <LtrNum className="text-lg font-bold">
-              {match.homeScore} - {match.awayScore}
-            </LtrNum>
+            <div className="flex flex-col items-center gap-0.5">
+              {match.status === "live" && match.minute != null ? (
+                <LtrNum className="text-[11px] font-semibold text-status-loss">
+                  {match.minute}׳
+                </LtrNum>
+              ) : null}
+              <LtrNum className="text-lg font-bold">
+                {match.homeScore} - {match.awayScore}
+              </LtrNum>
+            </div>
           ) : isFuture && match.date ? (
             <div className="flex flex-col items-center gap-0.5">
               <LtrNum className="text-[13px] font-medium text-foreground">{match.date}</LtrNum>

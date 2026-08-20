@@ -38,6 +38,7 @@ export type MatchListItem = {
   tieKey: string | null;
   seasonLabel: string | null;
   isCurrentSeason: boolean;
+  minute: number | null;
 };
 
 type TeamRow = { id: string; name_he: string | null; name_en: string | null; logo_url: string | null };
@@ -95,7 +96,7 @@ export async function getMatchesList(input: MatchesListInput = {}): Promise<Matc
   let query = supabaseAdmin
     .from("matches")
     .select(
-      "id, external_id, competition_id, home_team_id, away_team_id, home_score, away_score, kickoff_at, status, source, season, time_confirmed, venue, round_name, round_number, is_qualifier, stage, leg, tie_key",
+      "id, external_id, competition_id, home_team_id, away_team_id, home_score, away_score, kickoff_at, status, source, season, time_confirmed, venue, round_name, round_number, is_qualifier, stage, leg, tie_key, minute",
     )
     .not("home_team_id", "is", null)
     .not("away_team_id", "is", null)
@@ -234,6 +235,7 @@ export async function getMatchesList(input: MatchesListInput = {}): Promise<Matc
       isCurrentSeason: singleCompetitionId
         ? forcedSeasonIsCurrent
         : !seasonLabel || !currentSeason || seasonLabel === currentSeason,
+      minute: m.minute ?? null,
     });
   }
 
