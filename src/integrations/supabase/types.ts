@@ -1471,6 +1471,23 @@ export type Database = {
       }
       goal_bucket: { Args: { total: number }; Returns: string }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      pb_build_reason_lines: {
+        Args: {
+          p_away: string
+          p_expected_total: number
+          p_factors: Json
+          p_home: string
+          p_prob_away: number
+          p_prob_btts: number
+          p_prob_draw: number
+          p_prob_home: number
+          p_prob_over: number
+        }
+        Returns: string[]
+      }
+      pb_lock_due_predictions: { Args: never; Returns: number }
+      pb_refresh_match_history: { Args: never; Returns: number }
+      pb_settle_finished_matches: { Args: never; Returns: number }
       recompute_competition_baselines: {
         Args: never
         Returns: {
