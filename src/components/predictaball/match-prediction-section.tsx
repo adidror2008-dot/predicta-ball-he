@@ -140,7 +140,7 @@ export function MatchPredictionSection({
               <p className="mt-1 text-xs text-muted-foreground">
                 תוצאה בפועל{" "}
                 <LtrNum className="font-bold text-foreground">
-                  {header?.homeScore} : {header?.awayScore}
+                  {header?.awayScore} : {header?.homeScore}
                 </LtrNum>
               </p>
             ) : null}
