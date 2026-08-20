@@ -38,6 +38,7 @@ export type MatchListItem = {
   tieKey: string | null;
   seasonLabel: string | null;
   isCurrentSeason: boolean;
+  minute: number | null;
 };
 
 type TeamRow = { id: string; name_he: string | null; name_en: string | null; logo_url: string | null };
