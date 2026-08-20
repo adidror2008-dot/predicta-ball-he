@@ -63,6 +63,7 @@ function SortableChip({
         setNodeRef(node);
       }}
       type="button"
+      data-competition-id={competition.id}
       style={{
         transform: CSS.Transform.toString(transform),
         transition,

@@ -53,6 +53,20 @@ export function SwipeDeck({
 
   const width = () => containerRef.current?.offsetWidth ?? 1;
 
+  const indexDeltaForPhysicalDrag = useCallback((dx: number): 1 | -1 => {
+    const direction = containerRef.current
+      ? window.getComputedStyle(containerRef.current).direction
+      : "rtl";
+    const towardRight = dx > 0;
+    return direction === "rtl"
+      ? towardRight
+        ? -1
+        : 1
+      : towardRight
+        ? 1
+        : -1;
+  }, []);
+
   const reset = useCallback(() => {
     start.current = null;
     mode.current = "idle";
@@ -117,8 +131,7 @@ export function SwipeDeck({
       }
     }
 
-    // dx < 0 (finger toward screen start) reveals index + 1.
-    const dir = dx < 0 ? 1 : -1;
+    const dir = indexDeltaForPhysicalDrag(dx);
     const atEdge = dir === 1 ? index >= count - 1 : index <= 0;
     const applied = atEdge ? dx * EDGE_RESISTANCE : dx;
     if (!reducedMotion) setOffset(applied);
@@ -133,7 +146,7 @@ export function SwipeDeck({
     const raw = reducedMotion ? offsetFromLastRef.current : offset;
     const elapsed = Math.max(1, Date.now() - s.t);
     const velocity = Math.abs(raw) / elapsed;
-    const dir: 1 | -1 = raw < 0 ? 1 : -1;
+    const dir = indexDeltaForPhysicalDrag(raw);
     const atEdge = dir === 1 ? index >= count - 1 : index <= 0;
     const passed = Math.abs(raw) > width() * COMMIT_RATIO || velocity > FLICK_VELOCITY;
 
