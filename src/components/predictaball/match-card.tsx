@@ -66,9 +66,16 @@ export function MatchCard({ match }: { match: MatchCardData }) {
 
         <div className="w-14 shrink-0 text-center">
           {hasScore ? (
-            <LtrNum className="text-lg font-bold">
-              {match.homeScore} - {match.awayScore}
-            </LtrNum>
+            <div className="flex flex-col items-center gap-0.5">
+              {match.status === "live" && match.minute != null ? (
+                <LtrNum className="text-[11px] font-semibold text-status-loss">
+                  {match.minute}׳
+                </LtrNum>
+              ) : null}
+              <LtrNum className="text-lg font-bold">
+                {match.homeScore} - {match.awayScore}
+              </LtrNum>
+            </div>
           ) : isFuture && match.date ? (
             <div className="flex flex-col items-center gap-0.5">
               <LtrNum className="text-[13px] font-medium text-foreground">{match.date}</LtrNum>
