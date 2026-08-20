@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -48,10 +48,20 @@ function SortableChip({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: competition.id,
   });
+  const localRef = useRef<HTMLButtonElement | null>(null);
+
+  // Keep the active chip visible when the competition changes via swipe.
+  useEffect(() => {
+    if (!active || isDragging) return;
+    localRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+  }, [active, isDragging]);
 
   return (
     <button
-      ref={setNodeRef}
+      ref={(node) => {
+        localRef.current = node;
+        setNodeRef(node);
+      }}
       type="button"
       style={{
         transform: CSS.Transform.toString(transform),
