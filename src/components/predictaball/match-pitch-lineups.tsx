@@ -196,7 +196,7 @@ export function MatchPitchLineups({ matchRef }: { matchRef: string }) {
     queryFn: () => fetchHeader({ data: { matchExternalId: matchRef } }),
   });
 
-  if (isPending) return <SkeletonBlock className="min-h-[560px] w-full" />;
+  if (isPending) return <SkeletonBlock className="min-h-[660px] w-full" />;
 
   const home = data?.homeTeam ?? [];
   const away = data?.awayTeam ?? [];
@@ -207,7 +207,7 @@ export function MatchPitchLineups({ matchRef }: { matchRef: string }) {
 
   return (
     <div>
-      <div className="relative aspect-[3/4.6] min-h-[560px] w-full overflow-hidden rounded-2xl bg-pitch-turf">
+      <div className="relative aspect-[3/4.6] min-h-[660px] w-full overflow-hidden rounded-2xl bg-pitch-turf">
         <div className="pointer-events-none absolute inset-2 rounded-sm border border-pitch-line" />
         <div className="pointer-events-none absolute inset-x-2 top-1/2 h-px bg-pitch-line" />
         <div className="pointer-events-none absolute left-1/2 top-1/2 size-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-pitch-line" />
