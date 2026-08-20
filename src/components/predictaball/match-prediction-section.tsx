@@ -153,9 +153,9 @@ export function MatchPredictionSection({
         </div>
 
         <div className="mt-4 flex flex-col gap-3">
-          <Meter label="ניצחון בית" value={pct(data.probHome)} />
+          <Meter label={header?.homeName ? `ניצחון ${header.homeName}` : "ניצחון בית"} value={pct(data.probHome)} />
           <Meter label="תיקו" value={pct(data.probDraw)} />
-          <Meter label="ניצחון חוץ" value={pct(data.probAway)} />
+          <Meter label={header?.awayName ? `ניצחון ${header.awayName}` : "ניצחון חוץ"} value={pct(data.probAway)} />
         </div>
 
         <div className="mt-4 border-t border-border pt-3">
