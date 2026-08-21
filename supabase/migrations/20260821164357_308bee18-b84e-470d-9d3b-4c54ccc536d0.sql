@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS idx_competition_follows_competition ON public.competition_follows (competition_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_sent_match_kind ON public.notifications_sent (match_id, kind);
