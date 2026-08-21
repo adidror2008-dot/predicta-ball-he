@@ -153,6 +153,21 @@ function SettingsScreen() {
           </div>
         </div>
       </section>
+      <section className="mt-6 border-t border-border pt-6">
+        <button
+          type="button"
+          onClick={handleSignOut}
+          disabled={isSigningOut}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-destructive px-4 py-3 font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
+        >
+          {isSigningOut ? (
+            <Loader2 className="size-5 animate-spin" aria-hidden />
+          ) : (
+            <LogOut className="size-5" aria-hidden />
+          )}
+          <span>{isSigningOut ? "מתנתק..." : "התנתקות"}</span>
+        </button>
+      </section>
     </main>
   );
 }
