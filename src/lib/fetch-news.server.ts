@@ -146,7 +146,7 @@ export async function runFetchNews(): Promise<FetchNewsResult> {
     finished_at: new Date().toISOString(),
     status,
     result_metric: upserted,
-    result_detail: result as unknown as Record<string, unknown>,
+    result_detail: JSON.parse(JSON.stringify(result)),
     error: errors.length > 0 ? errors.join(" | ") : null,
   });
 
