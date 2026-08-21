@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { EmptyState, SectionTitle } from "@/components/predictaball/ui-bits";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/settings")({
+export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
     meta: [
       { title: "הגדרות — PredictaBall" },

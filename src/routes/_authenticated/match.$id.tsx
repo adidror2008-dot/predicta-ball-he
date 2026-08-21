@@ -9,7 +9,7 @@ import { MatchPitchLineups } from "@/components/predictaball/match-pitch-lineups
 import { MatchEventsTab } from "@/components/predictaball/match-events-tab";
 import { getMatchHeaderFn } from "@/lib/match-details-read.functions";
 
-export const Route = createFileRoute("/match/$id")({
+export const Route = createFileRoute("/_authenticated/match/$id")({
   head: () => ({
     meta: [
       { title: "פרטי משחק — PredictaBall" },

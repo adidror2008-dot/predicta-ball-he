@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { EmptyState, SkeletonBlock } from "@/components/predictaball/ui-bits";
 import { getNewsListFn } from "@/lib/news-read.functions";
 
-export const Route = createFileRoute("/news")({
+export const Route = createFileRoute("/_authenticated/news")({
   head: () => ({
     meta: [
       { title: "חדשות כדורגל — PredictaBall" },

@@ -18,7 +18,7 @@ import { getMatchesListFn } from "@/lib/matches-list.functions";
 import { getCompetitionsListFn } from "@/lib/competitions-list.functions";
 import { applyOrder, useChipPrefs } from "@/lib/chip-prefs";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: "PredictaBall — משחקי כדורגל ותחזיות" },

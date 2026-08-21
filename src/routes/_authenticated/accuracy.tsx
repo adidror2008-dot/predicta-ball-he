@@ -5,7 +5,7 @@ import { ChevronRight } from "lucide-react";
 import { EmptyState, LtrNum, SkeletonBlock } from "@/components/predictaball/ui-bits";
 import { getModelAccuracyFn } from "@/lib/match-details-read.functions";
 
-export const Route = createFileRoute("/accuracy")({
+export const Route = createFileRoute("/_authenticated/accuracy")({
   head: () => ({
     meta: [
       { title: "דיוק המודל — PredictaBall" },

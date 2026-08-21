@@ -9,13 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as AccuracyRouteImport } from './routes/accuracy'
 import { Route as AuthRouteImport } from './routes/auth'
-import { Route as NewsRouteImport } from './routes/news'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as MatchIdRouteImport } from './routes/match.$id'
+import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedAccuracyRouteImport } from './routes/_authenticated/accuracy'
+import { Route as AuthenticatedNewsRouteImport } from './routes/_authenticated/news'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedMatchIdRouteImport } from './routes/_authenticated/match.$id'
 import { Route as ApiCronRefreshRouteImport } from './routes/api/cron/refresh'
 import { Route as ApiPublicDiscoverSeasonsRouteImport } from './routes/api/public/discover-seasons'
 import { Route as ApiPublicFetchNewsRouteImport } from './routes/api/public/fetch-news'
@@ -26,24 +26,9 @@ import { Route as ApiPublicSyncFixturesDailyRouteImport } from './routes/api/pub
 import { Route as ApiPublicTickRouteImport } from './routes/api/public/tick'
 import { Route as ApiPublicVerifyEndpointsRouteImport } from './routes/api/public/verify-endpoints'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AccuracyRoute = AccuracyRouteImport.update({
-  id: '/accuracy',
-  path: '/accuracy',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NewsRoute = NewsRouteImport.update({
-  id: '/news',
-  path: '/news',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -51,13 +36,28 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
   path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
+const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
+  id: '/_authenticated/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAccuracyRoute = AuthenticatedAccuracyRouteImport.update({
+  id: '/_authenticated/accuracy',
+  path: '/accuracy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedNewsRoute = AuthenticatedNewsRouteImport.update({
+  id: '/_authenticated/news',
+  path: '/news',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/_authenticated/settings',
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MatchIdRoute = MatchIdRouteImport.update({
-  id: '/match/$id',
+const AuthenticatedMatchIdRoute = AuthenticatedMatchIdRouteImport.update({
+  id: '/_authenticated/match/$id',
   path: '/match/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
@@ -114,13 +114,13 @@ const ApiPublicVerifyEndpointsRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/accuracy': typeof AccuracyRoute
   '/auth': typeof AuthRoute
-  '/news': typeof NewsRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/settings': typeof SettingsRoute
-  '/match/$id': typeof MatchIdRoute
+  '/accuracy': typeof AuthenticatedAccuracyRoute
+  '/news': typeof AuthenticatedNewsRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/': typeof AuthenticatedIndexRoute
+  '/match/$id': typeof AuthenticatedMatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
   '/api/public/fetch-news': typeof ApiPublicFetchNewsRoute
@@ -132,13 +132,13 @@ export interface FileRoutesByFullPath {
   '/api/public/verify-endpoints': typeof ApiPublicVerifyEndpointsRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/accuracy': typeof AccuracyRoute
   '/auth': typeof AuthRoute
-  '/news': typeof NewsRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/settings': typeof SettingsRoute
-  '/match/$id': typeof MatchIdRoute
+  '/accuracy': typeof AuthenticatedAccuracyRoute
+  '/news': typeof AuthenticatedNewsRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/': typeof AuthenticatedIndexRoute
+  '/match/$id': typeof AuthenticatedMatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
   '/api/public/fetch-news': typeof ApiPublicFetchNewsRoute
@@ -151,13 +151,13 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/accuracy': typeof AccuracyRoute
   '/auth': typeof AuthRoute
-  '/news': typeof NewsRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/settings': typeof SettingsRoute
-  '/match/$id': typeof MatchIdRoute
+  '/_authenticated/accuracy': typeof AuthenticatedAccuracyRoute
+  '/_authenticated/news': typeof AuthenticatedNewsRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/match/$id': typeof AuthenticatedMatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
   '/api/public/fetch-news': typeof ApiPublicFetchNewsRoute
@@ -171,12 +171,12 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
-    | '/accuracy'
     | '/auth'
-    | '/news'
     | '/reset-password'
+    | '/accuracy'
+    | '/news'
     | '/settings'
+    | '/'
     | '/match/$id'
     | '/api/cron/refresh'
     | '/api/public/discover-seasons'
@@ -189,12 +189,12 @@ export interface FileRouteTypes {
     | '/api/public/verify-endpoints'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
-    | '/accuracy'
     | '/auth'
-    | '/news'
     | '/reset-password'
+    | '/accuracy'
+    | '/news'
     | '/settings'
+    | '/'
     | '/match/$id'
     | '/api/cron/refresh'
     | '/api/public/discover-seasons'
@@ -207,13 +207,13 @@ export interface FileRouteTypes {
     | '/api/public/verify-endpoints'
   id:
     | '__root__'
-    | '/'
-    | '/accuracy'
     | '/auth'
-    | '/news'
     | '/reset-password'
-    | '/settings'
-    | '/match/$id'
+    | '/_authenticated/accuracy'
+    | '/_authenticated/news'
+    | '/_authenticated/settings'
+    | '/_authenticated/'
+    | '/_authenticated/match/$id'
     | '/api/cron/refresh'
     | '/api/public/discover-seasons'
     | '/api/public/fetch-news'
@@ -226,13 +226,13 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  AccuracyRoute: typeof AccuracyRoute
   AuthRoute: typeof AuthRoute
-  NewsRoute: typeof NewsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
-  SettingsRoute: typeof SettingsRoute
-  MatchIdRoute: typeof MatchIdRoute
+  AuthenticatedAccuracyRoute: typeof AuthenticatedAccuracyRoute
+  AuthenticatedNewsRoute: typeof AuthenticatedNewsRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedMatchIdRoute: typeof AuthenticatedMatchIdRoute
   ApiCronRefreshRoute: typeof ApiCronRefreshRoute
   ApiPublicDiscoverSeasonsRoute: typeof ApiPublicDiscoverSeasonsRoute
   ApiPublicFetchNewsRoute: typeof ApiPublicFetchNewsRoute
@@ -246,32 +246,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/accuracy': {
-      id: '/accuracy'
-      path: '/accuracy'
-      fullPath: '/accuracy'
-      preLoaderRoute: typeof AccuracyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/auth': {
       id: '/auth'
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/news': {
-      id: '/news'
-      path: '/news'
-      fullPath: '/news'
-      preLoaderRoute: typeof NewsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -281,18 +260,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
+    '/_authenticated/': {
+      id: '/_authenticated/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/match/$id': {
-      id: '/match/$id'
+    '/_authenticated/accuracy': {
+      id: '/_authenticated/accuracy'
+      path: '/accuracy'
+      fullPath: '/accuracy'
+      preLoaderRoute: typeof AuthenticatedAccuracyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/news': {
+      id: '/_authenticated/news'
+      path: '/news'
+      fullPath: '/news'
+      preLoaderRoute: typeof AuthenticatedNewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/match/$id': {
+      id: '/_authenticated/match/$id'
       path: '/match/$id'
       fullPath: '/match/$id'
-      preLoaderRoute: typeof MatchIdRouteImport
+      preLoaderRoute: typeof AuthenticatedMatchIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/cron/refresh': {
@@ -362,13 +362,13 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  AccuracyRoute: AccuracyRoute,
   AuthRoute: AuthRoute,
-  NewsRoute: NewsRoute,
   ResetPasswordRoute: ResetPasswordRoute,
-  SettingsRoute: SettingsRoute,
-  MatchIdRoute: MatchIdRoute,
+  AuthenticatedAccuracyRoute: AuthenticatedAccuracyRoute,
+  AuthenticatedNewsRoute: AuthenticatedNewsRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedMatchIdRoute: AuthenticatedMatchIdRoute,
   ApiCronRefreshRoute: ApiCronRefreshRoute,
   ApiPublicDiscoverSeasonsRoute: ApiPublicDiscoverSeasonsRoute,
   ApiPublicFetchNewsRoute: ApiPublicFetchNewsRoute,
