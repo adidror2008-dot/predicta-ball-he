@@ -123,9 +123,12 @@ export async function runNotifications(
   const prefs = new Map<string, PrefRow>();
   for (const row of (prefRows ?? []) as PrefRow[]) prefs.set(row.user_id, row);
 
+  const hasSub = (userId: string) => (subsByUser.get(userId)?.length ?? 0) > 0;
+
   const allows = (userId: string, kind: "lineup" | "kickoff" | "goal"): boolean => {
     const p = prefs.get(userId);
     if (!p || p.notifications_enabled !== true) return false;
+    if (!hasSub(userId)) return false;
     if (kind === "lineup") return p.notify_lineups !== false;
     if (kind === "kickoff") return p.notify_kickoff !== false;
     return p.notify_goals !== false;
