@@ -1,9 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ChevronLeft, X } from "lucide-react";
+import { ChevronLeft, Loader2, LogOut, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { EmptyState, SectionTitle } from "@/components/predictaball/ui-bits";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
