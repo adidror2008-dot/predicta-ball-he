@@ -11,7 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccuracyRouteImport } from './routes/accuracy'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as NewsRouteImport } from './routes/news'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as MatchIdRouteImport } from './routes/match.$id'
 import { Route as ApiCronRefreshRouteImport } from './routes/api/cron/refresh'
@@ -34,9 +36,19 @@ const AccuracyRoute = AccuracyRouteImport.update({
   path: '/accuracy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const NewsRoute = NewsRouteImport.update({
   id: '/news',
   path: '/news',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -104,7 +116,9 @@ const ApiPublicVerifyEndpointsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accuracy': typeof AccuracyRoute
+  '/auth': typeof AuthRoute
   '/news': typeof NewsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/match/$id': typeof MatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
@@ -120,7 +134,9 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accuracy': typeof AccuracyRoute
+  '/auth': typeof AuthRoute
   '/news': typeof NewsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/match/$id': typeof MatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
@@ -137,7 +153,9 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/accuracy': typeof AccuracyRoute
+  '/auth': typeof AuthRoute
   '/news': typeof NewsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/match/$id': typeof MatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
@@ -155,7 +173,9 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/accuracy'
+    | '/auth'
     | '/news'
+    | '/reset-password'
     | '/settings'
     | '/match/$id'
     | '/api/cron/refresh'
@@ -171,7 +191,9 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/accuracy'
+    | '/auth'
     | '/news'
+    | '/reset-password'
     | '/settings'
     | '/match/$id'
     | '/api/cron/refresh'
@@ -187,7 +209,9 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/accuracy'
+    | '/auth'
     | '/news'
+    | '/reset-password'
     | '/settings'
     | '/match/$id'
     | '/api/cron/refresh'
@@ -204,7 +228,9 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccuracyRoute: typeof AccuracyRoute
+  AuthRoute: typeof AuthRoute
   NewsRoute: typeof NewsRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SettingsRoute: typeof SettingsRoute
   MatchIdRoute: typeof MatchIdRoute
   ApiCronRefreshRoute: typeof ApiCronRefreshRoute
@@ -234,11 +260,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccuracyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/news': {
       id: '/news'
       path: '/news'
       fullPath: '/news'
       preLoaderRoute: typeof NewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -324,7 +364,9 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccuracyRoute: AccuracyRoute,
+  AuthRoute: AuthRoute,
   NewsRoute: NewsRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SettingsRoute: SettingsRoute,
   MatchIdRoute: MatchIdRoute,
   ApiCronRefreshRoute: ApiCronRefreshRoute,
