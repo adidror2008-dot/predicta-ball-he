@@ -76,7 +76,7 @@ function SettingsScreen() {
                   checked={master && subs[t.id] === true}
                   disabled={!master}
                   aria-label={t.label}
-                  onCheckedChange={(v) => setSubs((s) => ({ ...s, [t.id]: v }))}
+                  onCheckedChange={(v: boolean) => setSubs((s) => ({ ...s, [t.id]: v }))}
                 />
               </div>
             ))}
