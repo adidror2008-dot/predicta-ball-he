@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { MatchSnapshot } from "@/lib/notifications.server";
 
 const SOFASCORE_HOST = "sportapi7.p.rapidapi.com";
 const SOURCE = "sofascore";
@@ -28,6 +29,7 @@ export type TickResult = {
   needs_review_flagged: number;
   lineups_prefetched: number;
   finals_fetched: number;
+  notifications_sent: number;
   reason?: string;
 };
 
@@ -53,6 +55,7 @@ export async function runTick(): Promise<TickResult> {
   let competitionsSettled = 0;
   let matchesSettled = 0;
   let needsReviewFlagged = 0;
+  let notificationDetail: Record<string, any> | null = null;
 
   const finish = async (
     status: "success" | "partial" | "failed",
@@ -64,7 +67,7 @@ export async function runTick(): Promise<TickResult> {
       started_at: startedAt,
       finished_at: new Date().toISOString(),
       status,
-      result_metric: liveUpdated + matchesSettled,
+      result_metric: notificationsSent,
       result_detail: detail as never,
       error: error ?? null,
     });
@@ -101,7 +104,9 @@ export async function runTick(): Promise<TickResult> {
   // ---- STEP 1: pure database
   const { data: activeMatches, error: activeError } = await supabaseAdmin
     .from("matches")
-    .select("id, external_id, competition_id, kickoff_at, status, needs_review, live_source")
+    .select(
+      "id, external_id, competition_id, kickoff_at, status, needs_review, live_source, home_score, away_score",
+    )
     .eq("source", SOURCE)
     .not("external_id", "is", null)
     .not("kickoff_at", "is", null)
@@ -114,6 +119,7 @@ export async function runTick(): Promise<TickResult> {
 
   let lineupsPrefetched = 0;
   let finalsFetched = 0;
+  let notificationsSent = 0;
 
   const baseResult = (
     status: TickResult["status"],
@@ -130,6 +136,7 @@ export async function runTick(): Promise<TickResult> {
     needs_review_flagged: needsReviewFlagged,
     lineups_prefetched: lineupsPrefetched,
     finals_fetched: finalsFetched,
+    notifications_sent: notificationsSent,
     ...(reason ? { reason } : {}),
   });
 
@@ -186,6 +193,25 @@ export async function runTick(): Promise<TickResult> {
 
   const byExternalId = new Map(active.map((m) => [String(m.external_id), m]));
 
+  // Snapshot BEFORE the live sweep — the notification engine needs the previous
+  // status/score to detect a kickoff or a new goal without extra API calls.
+  const snapshots = new Map<string, MatchSnapshot>(
+    active.map((m) => [
+      m.id,
+      {
+        match_id: m.id,
+        external_id: String(m.external_id),
+        competition_id: m.competition_id,
+        status: m.status,
+        prev_status: m.status,
+        home_score: m.home_score,
+        away_score: m.away_score,
+        prev_home_score: m.home_score,
+        prev_away_score: m.away_score,
+      },
+    ]),
+  );
+
 
   // ---- STEP 2: one live sweep for the whole world
   const seenLive = new Set<string>();
@@ -212,7 +238,15 @@ export async function runTick(): Promise<TickResult> {
             fetched_at: new Date().toISOString(),
           })
           .eq("id", mine.id);
-        if (!error) liveUpdated += 1;
+        if (!error) {
+          liveUpdated += 1;
+          const snap = snapshots.get(mine.id);
+          if (snap) {
+            snap.status = ev["status"]?.["type"] ?? snap.status;
+            snap.home_score = ev["homeScore"]?.["current"] ?? snap.home_score;
+            snap.away_score = ev["awayScore"]?.["current"] ?? snap.away_score;
+          }
+        }
       }
     }
   } else {
@@ -332,7 +366,19 @@ export async function runTick(): Promise<TickResult> {
     if (!error) matchesSettled += 1;
   }
 
+  // ---- STEP 4: notification engine (no extra live calls)
+  try {
+    const { runNotifications } = await import("@/lib/notifications.server");
+    const notif = await runNotifications([...snapshots.values()]);
+    notificationsSent = notif.notifications_sent;
+    notificationDetail = notif;
+  } catch (e) {
+    notificationDetail = { error: e instanceof Error ? e.message : "notifications failed" };
+  }
+
   const detail = {
+    notifications: notificationDetail,
+    notifications_sent: notificationsSent,
     api_calls_made: apiCalls,
     active_matches: active.length,
     live_matches_updated: liveUpdated,
