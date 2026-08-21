@@ -1,9 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ChevronLeft, X } from "lucide-react";
+import { ChevronLeft, Loader2, LogOut, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { EmptyState, SectionTitle } from "@/components/predictaball/ui-bits";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
@@ -32,13 +33,22 @@ const subToggles = [
 ] as const;
 
 function SettingsScreen() {
+  const navigate = useNavigate();
   const [master, setMaster] = useState(false);
   const [subs, setSubs] = useState<Record<string, boolean>>({
     lineup: false,
     kickoff: false,
     final: false,
   });
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const followed: FollowedCompetition[] = [];
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    await supabase.auth.signOut();
+    navigate({ to: "/auth" });
+  };
 
   return (
     <main className="space-y-6 px-4 pt-5">
@@ -66,7 +76,7 @@ function SettingsScreen() {
                   checked={master && subs[t.id] === true}
                   disabled={!master}
                   aria-label={t.label}
-                  onCheckedChange={(v) => setSubs((s) => ({ ...s, [t.id]: v }))}
+                  onCheckedChange={(v: boolean) => setSubs((s) => ({ ...s, [t.id]: v }))}
                 />
               </div>
             ))}
@@ -129,8 +139,8 @@ function SettingsScreen() {
           </p>
           <p className="text-xs text-muted-foreground">כדורגל · חיזוי · כיף</p>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            האפליקציה מציגה לכל משחק תחזית סטטיסטית מוסברת, המבוססת על נתוני עבר,
-            כושר הקבוצות ונתוני המשחק — כך שתמיד ברור מדוע התחזית היא כפי שהיא.
+            האפליקציה מציגה לכל משחק תחזית סטטיסטית מוסברת, המבוססת על נתוני עבר, כושר הקבוצות
+            ונתוני המשחק — כך שתמיד ברור מדוע התחזית היא כפי שהיא.
           </p>
           <p className="mt-3 text-xs text-muted-foreground">
             מקורות: נתוני משחקים ותחרויות ממקורות רשמיים.
@@ -142,6 +152,21 @@ function SettingsScreen() {
             </span>
           </div>
         </div>
+      </section>
+      <section className="mt-6 border-t border-border pt-6">
+        <button
+          type="button"
+          onClick={handleSignOut}
+          disabled={isSigningOut}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-destructive px-4 py-3 font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
+        >
+          {isSigningOut ? (
+            <Loader2 className="size-5 animate-spin" aria-hidden />
+          ) : (
+            <LogOut className="size-5" aria-hidden />
+          )}
+          <span>{isSigningOut ? "מתנתק..." : "התנתקות"}</span>
+        </button>
       </section>
     </main>
   );
