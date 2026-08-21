@@ -111,3 +111,17 @@ export async function ensurePushSubscription(): Promise<EnsurePushResult> {
     return { ok: false, reason: "error", message: e instanceof Error ? e.message : "unknown" };
   }
 }
+
+/** True only on iOS Safari that is not running as an installed home-screen app. */
+export function needsIosHomeScreen(): boolean {
+  if (typeof window === "undefined") return false;
+  const ua = navigator.userAgent;
+  const isIos =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (!isIos) return false;
+  const standalone =
+    window.matchMedia?.("(display-mode: standalone)").matches ||
+    (navigator as unknown as { standalone?: boolean }).standalone === true;
+  return !standalone;
+}
