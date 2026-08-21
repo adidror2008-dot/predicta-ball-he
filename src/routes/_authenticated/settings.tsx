@@ -33,13 +33,22 @@ const subToggles = [
 ] as const;
 
 function SettingsScreen() {
+  const navigate = useNavigate();
   const [master, setMaster] = useState(false);
   const [subs, setSubs] = useState<Record<string, boolean>>({
     lineup: false,
     kickoff: false,
     final: false,
   });
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const followed: FollowedCompetition[] = [];
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    await supabase.auth.signOut();
+    navigate({ to: "/auth" });
+  };
 
   return (
     <main className="space-y-6 px-4 pt-5">
