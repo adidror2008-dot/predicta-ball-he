@@ -44,11 +44,7 @@ export function useCompetitionFollows() {
 
 type ToggleInput = { id: string; following: boolean };
 
-function useToggle(
-  table: "match_follows" | "competition_follows",
-  column: "match_id" | "competition_id",
-  queryKey: string,
-) {
+export function useToggleMatchFollow() {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -58,33 +54,59 @@ function useToggle(
 
       if (following) {
         const { error } = await supabase
-          .from(table)
+          .from("match_follows")
           .delete()
           .eq("user_id", userId)
-          .eq(column, id);
+          .eq("match_id", id);
         if (error) throw error;
         return { following: false };
       }
 
       // First follow ever also asks for browser permission and stores the subscription.
       await ensurePushSubscription();
-      const { error } = await supabase.from(table).insert({ user_id: userId, [column]: id });
+      const { error } = await supabase
+        .from("match_follows")
+        .insert({ user_id: userId, match_id: id });
       if (error && error.code !== "23505") throw error;
       return { following: true };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [queryKey] });
+      queryClient.invalidateQueries({ queryKey: ["match-follows"] });
+      queryClient.invalidateQueries({ queryKey: ["settings-followed-matches"] });
     },
-    onError: () => {
-      toast.error("הפעולה נכשלה, נסו שוב");
-    },
+    onError: () => toast.error("הפעולה נכשלה, נסו שוב"),
   });
 }
 
-export function useToggleMatchFollow() {
-  return useToggle("match_follows", "match_id", "match-follows");
-}
-
 export function useToggleCompetitionFollow() {
-  return useToggle("competition_follows", "competition_id", "competition-follows");
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, following }: ToggleInput) => {
+      const userId = await currentUserId();
+      if (!userId) throw new Error("no session");
+
+      if (following) {
+        const { error } = await supabase
+          .from("competition_follows")
+          .delete()
+          .eq("user_id", userId)
+          .eq("competition_id", id);
+        if (error) throw error;
+        return { following: false };
+      }
+
+      await ensurePushSubscription();
+      const { error } = await supabase
+        .from("competition_follows")
+        .insert({ user_id: userId, competition_id: id });
+      if (error && error.code !== "23505") throw error;
+      return { following: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["competition-follows"] });
+      queryClient.invalidateQueries({ queryKey: ["settings-followed-competitions"] });
+    },
+    onError: () => toast.error("הפעולה נכשלה, נסו שוב"),
+  });
 }
