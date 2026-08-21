@@ -436,6 +436,35 @@ export type Database = {
           },
         ]
       }
+      match_follows: {
+        Row: {
+          created_at: string
+          id: string
+          match_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          match_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          match_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_follows_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_stats: {
         Row: {
           fetched_at: string | null
@@ -1407,6 +1436,7 @@ export type Database = {
         Row: {
           chip_order: Json | null
           notifications_enabled: boolean | null
+          notify_goals: boolean | null
           notify_kickoff: boolean | null
           notify_lineups: boolean | null
           notify_result: boolean | null
@@ -1416,6 +1446,7 @@ export type Database = {
         Insert: {
           chip_order?: Json | null
           notifications_enabled?: boolean | null
+          notify_goals?: boolean | null
           notify_kickoff?: boolean | null
           notify_lineups?: boolean | null
           notify_result?: boolean | null
@@ -1425,6 +1456,7 @@ export type Database = {
         Update: {
           chip_order?: Json | null
           notifications_enabled?: boolean | null
+          notify_goals?: boolean | null
           notify_kickoff?: boolean | null
           notify_lineups?: boolean | null
           notify_result?: boolean | null
