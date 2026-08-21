@@ -157,12 +157,12 @@ export async function runNotifications(
   const teamIds = new Set<string>();
   const { data: matchRows, error: matchError } = await supabaseAdmin
     .from("matches")
-    .select("id, home_team_id, away_team_id")
+    .select("id, home_team_id, away_team_id, kickoff_at")
     .in("id", matchIds);
   if (matchError) result.errors.push(`matches: ${matchError.message}`);
-  const matchTeams = new Map<string, { home: string | null; away: string | null }>();
+  const matchTeams = new Map<string, { home: string | null; away: string | null; kickoff: string | null }>();
   for (const row of matchRows ?? []) {
-    matchTeams.set(row.id, { home: row.home_team_id, away: row.away_team_id });
+    matchTeams.set(row.id, { home: row.home_team_id, away: row.away_team_id, kickoff: row.kickoff_at });
     if (row.home_team_id) teamIds.add(row.home_team_id);
     if (row.away_team_id) teamIds.add(row.away_team_id);
   }
@@ -224,9 +224,9 @@ export async function runNotifications(
   for (const s of followed) {
     if (!lineupMatchIds.has(s.match_id)) continue;
     for (const userId of followersByMatch.get(s.match_id) ?? []) {
-      if (sentKeys.has(`${userId}|${s.match_id}|lineup`)) continue;
+      if (sentKeys.has(`${userId}|${s.match_id}|lineups`)) continue;
       if (!allows(userId, "lineup")) continue;
-      await deliver(userId, s.match_id, "lineup", {
+      await deliver(userId, s.match_id, "lineups", {
         title: "פורסם הרכב רשמי",
         body: titleOf(s.match_id),
         url: `/match/${s.match_id}`,
@@ -239,19 +239,22 @@ export async function runNotifications(
 
   // =========== b) kickoff (grouped per user) ===========
   const kickoffByUser = new Map<string, string[]>();
+  const kickoffSlot = (matchId: string) => matchTeams.get(matchId)?.kickoff ?? "unknown";
   for (const s of followed) {
     const started = isLiveStatus(s.status) && !isLiveStatus(s.prev_status);
     if (!started) continue;
     for (const userId of followersByMatch.get(s.match_id) ?? []) {
       if (sentKeys.has(`${userId}|${s.match_id}|kickoff`)) continue;
       if (!allows(userId, "kickoff")) continue;
-      const list = kickoffByUser.get(userId) ?? [];
+      const key = `${userId}|${kickoffSlot(s.match_id)}`;
+      const list = kickoffByUser.get(key) ?? [];
       list.push(s.match_id);
-      kickoffByUser.set(userId, list);
+      kickoffByUser.set(key, list);
     }
   }
 
-  for (const [userId, ids] of kickoffByUser) {
+  for (const [groupKey, ids] of kickoffByUser) {
+    const userId = groupKey.split("|")[0] as string;
     const subs = subsByUser.get(userId) ?? [];
     const payload: PushPayload =
       ids.length >= 2
@@ -300,7 +303,7 @@ export async function runNotifications(
     const awayScored = away > prevAway;
     if (!homeScored && !awayScored) continue;
 
-    const kind = `goal:${home}-${away}`;
+    const kind = `goal_${home}_${away}`;
     const recipients = [...(followersByMatch.get(s.match_id) ?? [])].filter(
       (u) => allows(u, "goal") && !sentKeys.has(`${u}|${s.match_id}|${kind}`),
     );
