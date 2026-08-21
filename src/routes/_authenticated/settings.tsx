@@ -257,9 +257,12 @@ function SettingsScreen() {
               ))}
             </div>
 
-            <p className="mt-4 text-xs text-muted-foreground">
-              באייפון יש להוסיף את האפליקציה למסך הבית כדי לקבל התראות.
-            </p>
+            {needsIosHomeScreen() ? (
+              <p className="mt-4 text-xs text-muted-foreground">
+                באייפון יש להוסיף את האפליקציה למסך הבית כדי לקבל התראות.
+              </p>
+            ) : null}
+
           </div>
         )}
       </section>
