@@ -7,6 +7,7 @@ import {
   CompetitionChips,
   type Competition,
 } from "@/components/predictaball/competition-chips";
+import { CompetitionFollowBell } from "@/components/predictaball/follow-bell";
 import {
   CompetitionPickerSheet,
   type PickerCompetition,
@@ -263,14 +264,17 @@ function MatchesScreen() {
           <span className="text-foreground">Predicta</span>
           <span className="text-brand-gradient">Ball</span>
         </h1>
-        <button
-          type="button"
-          aria-label="רענון"
-          onClick={() => setRefreshToken((v) => v + 1)}
-          className="rounded-2xl bg-surface p-2.5 text-muted-foreground transition-colors active:bg-surface-2"
-        >
-          <RotateCw className={isFetching ? "size-4 animate-spin" : "size-4"} aria-hidden />
-        </button>
+        <div className="flex items-center gap-2">
+          {activeId ? <CompetitionFollowBell competitionId={activeId} /> : null}
+          <button
+            type="button"
+            aria-label="רענון"
+            onClick={() => setRefreshToken((v) => v + 1)}
+            className="rounded-2xl bg-surface p-2.5 text-muted-foreground transition-colors active:bg-surface-2"
+          >
+            <RotateCw className={isFetching ? "size-4 animate-spin" : "size-4"} aria-hidden />
+          </button>
+        </div>
       </header>
 
       <CompetitionChips
