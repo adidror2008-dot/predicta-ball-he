@@ -1464,6 +1464,7 @@ export type Database = {
       }
     }
     Functions: {
+      admin_email: { Args: never; Returns: string }
       api_budget_take: {
         Args: { p_category: string; p_count?: number; p_provider: string }
         Returns: boolean
@@ -1474,6 +1475,7 @@ export type Database = {
       }
       goal_bucket: { Args: { total: number }; Returns: string }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      norm_email: { Args: { _email: string }; Returns: string }
       pb_build_reason_lines: {
         Args: {
           p_away: string
