@@ -11,8 +11,11 @@ type BellProps = {
   label: string;
   following: boolean;
   pending?: boolean;
+  variant?: "chip" | "icon";
+  className?: string;
   onClick: () => void;
 };
+
 
 export function FollowBell({ label, following, pending, onClick }: BellProps) {
   return (
