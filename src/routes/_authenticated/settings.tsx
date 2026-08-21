@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { EmptyState, SectionTitle, SkeletonBlock } from "@/components/predictaball/ui-bits";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { ensurePushSubscription } from "@/lib/push-client";
+import { ensurePushSubscription, needsIosHomeScreen } from "@/lib/push-client";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
@@ -257,9 +257,12 @@ function SettingsScreen() {
               ))}
             </div>
 
-            <p className="mt-4 text-xs text-muted-foreground">
-              באייפון יש להוסיף את האפליקציה למסך הבית כדי לקבל התראות.
-            </p>
+            {needsIosHomeScreen() ? (
+              <p className="mt-4 text-xs text-muted-foreground">
+                באייפון יש להוסיף את האפליקציה למסך הבית כדי לקבל התראות.
+              </p>
+            ) : null}
+
           </div>
         )}
       </section>

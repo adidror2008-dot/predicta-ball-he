@@ -42,9 +42,11 @@ export function MatchCard({ match }: { match: MatchCardData }) {
       id={`match-${match.id}`}
       to="/match/$id"
       params={{ id: match.id }}
-      className="block rounded-2xl bg-card p-4 shadow-card transition-colors hover:bg-surface-2"
+      className="relative block rounded-2xl bg-card p-4 shadow-card transition-colors hover:bg-surface-2"
     >
-      <div className="flex items-center justify-between gap-3">
+      <MatchFollowBell matchId={match.id} />
+
+      <div className="flex items-center justify-between gap-3 pe-9">
         <span
           className={cn(
             "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium",
@@ -58,9 +60,9 @@ export function MatchCard({ match }: { match: MatchCardData }) {
           {!isFuture && match.date ? (
             <LtrNum className="text-[11px] text-muted-foreground">{match.date}</LtrNum>
           ) : null}
-          <MatchFollowBell matchId={match.id} />
         </div>
       </div>
+
 
       <div className="mt-3 flex items-center gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-2">
