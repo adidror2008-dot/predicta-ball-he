@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { BallIcon } from "./ball-icon";
+import { MatchFollowBell } from "./follow-bell";
 import { LtrNum, LogoSlot } from "./ui-bits";
 import { cn } from "@/lib/utils";
 
@@ -53,9 +54,12 @@ export function MatchCard({ match }: { match: MatchCardData }) {
           {match.status === "live" ? <BallIcon spin /> : null}
           {statusLabel[match.status]}
         </span>
-        {!isFuture && match.date ? (
-          <LtrNum className="text-[11px] text-muted-foreground">{match.date}</LtrNum>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {!isFuture && match.date ? (
+            <LtrNum className="text-[11px] text-muted-foreground">{match.date}</LtrNum>
+          ) : null}
+          <MatchFollowBell matchId={match.id} />
+        </div>
       </div>
 
       <div className="mt-3 flex items-center gap-3">
