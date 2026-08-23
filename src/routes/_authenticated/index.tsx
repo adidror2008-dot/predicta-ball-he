@@ -284,13 +284,15 @@ function MatchesScreen() {
         </div>
       </header>
 
-      <CompetitionChips
-        competitions={competitions}
-        activeId={activeId}
-        onSelect={selectCompetition}
-        onReorder={(ids) => update({ ...prefs, order: ids })}
-        onOpenPicker={() => setPickerOpen(true)}
-      />
+      <div className="sticky top-0 z-30 -mx-4 bg-background px-4 py-2 border-b border-border">
+        <CompetitionChips
+          competitions={competitions}
+          activeId={activeId}
+          onSelect={selectCompetition}
+          onReorder={(ids) => update({ ...prefs, order: ids })}
+          onOpenPicker={() => setPickerOpen(true)}
+        />
+      </div>
 
       {activeCompetition ? (
         <div className="mt-2 flex">
