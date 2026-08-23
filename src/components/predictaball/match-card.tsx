@@ -36,6 +36,7 @@ const statusClass: Record<MatchStatus, string> = {
 export function MatchCard({ match }: { match: MatchCardData }) {
   const hasScore = match.homeScore !== null && match.awayScore !== null;
   const isFuture = match.status === "scheduled";
+  const isFinished = match.status === "finished";
 
   return (
     <Link
@@ -44,9 +45,9 @@ export function MatchCard({ match }: { match: MatchCardData }) {
       params={{ id: match.id }}
       className="relative block rounded-2xl bg-card p-4 shadow-card transition-colors hover:bg-surface-2"
     >
-      <MatchFollowBell matchId={match.id} />
+      {!isFinished ? <MatchFollowBell matchId={match.id} /> : null}
 
-      <div className="flex items-center justify-between gap-3 pe-9">
+      <div className={cn("flex items-center justify-between gap-3", !isFinished && "pe-9")}>
         <span
           className={cn(
             "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium",
