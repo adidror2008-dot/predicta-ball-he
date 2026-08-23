@@ -15,6 +15,8 @@ import {
 import { MatchCard, type MatchCardData, type MatchStatus } from "@/components/predictaball/match-card";
 import { EmptyState, SkeletonBlock } from "@/components/predictaball/ui-bits";
 import { SwipeDeck } from "@/components/predictaball/swipe-deck";
+import { StandingsButton, StandingsSheet } from "@/components/predictaball/standings-sheet";
+
 import { getMatchesListFn } from "@/lib/matches-list.functions";
 import { getCompetitionsListFn } from "@/lib/competitions-list.functions";
 import { applyOrder, useChipPrefs } from "@/lib/chip-prefs";
@@ -185,6 +187,8 @@ function MatchesScreen() {
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [standingsOpen, setStandingsOpen] = useState(false);
+
   const [isFetching, setIsFetching] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
   const { prefs, hydrated, update } = useChipPrefs();
@@ -255,6 +259,9 @@ function MatchesScreen() {
     competitions.findIndex((c) => c.id === activeId),
   );
 
+  const activeCompetition = competitions.find((c) => c.id === activeId) ?? null;
+
+
   const showSkeleton = !hydrated || isLoadingCompetitions;
 
   return (
@@ -284,6 +291,22 @@ function MatchesScreen() {
         onReorder={(ids) => update({ ...prefs, order: ids })}
         onOpenPicker={() => setPickerOpen(true)}
       />
+
+      {activeCompetition ? (
+        <div className="mt-2 flex">
+          <StandingsButton onClick={() => setStandingsOpen(true)} />
+        </div>
+      ) : null}
+
+      {activeCompetition ? (
+        <StandingsSheet
+          open={standingsOpen}
+          onOpenChange={setStandingsOpen}
+          competitionId={activeCompetition.id}
+          competitionName={activeCompetition.name}
+        />
+      ) : null}
+
 
       <CompetitionPickerSheet
         open={pickerOpen}
