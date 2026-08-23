@@ -5,6 +5,8 @@ import { EmptyState, LogoSlot, SkeletonBlock } from "@/components/predictaball/u
 import { supabase } from "@/integrations/supabase/client";
 
 const MIN_ROWS = 10;
+const LOGO_BUCKET = "team-logos";
+const LOGO_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7;
 
 type StandingRow = {
   position: number | null;
@@ -21,6 +23,34 @@ type StandingRow = {
   teams: { name_he: string | null; name_en: string | null; logo_url: string | null } | null;
 };
 
+/**
+ * The `team-logos` bucket stores relative paths (e.g. `sofascore/1641.png`),
+ * so logos are signed at read time — the same approach the match list uses.
+ */
+async function signLogos(rows: StandingRow[]) {
+  const paths = Array.from(
+    new Set(
+      rows
+        .map((r) => r.teams?.logo_url)
+        .filter((u): u is string => !!u && !/^https?:\/\//i.test(u)),
+    ),
+  );
+  const signedByPath = new Map<string, string>();
+  if (paths.length > 0) {
+    const { data } = await supabase.storage
+      .from(LOGO_BUCKET)
+      .createSignedUrls(paths, LOGO_SIGNED_URL_TTL_SECONDS);
+    for (const s of data ?? []) {
+      if (s.signedUrl && s.path) signedByPath.set(s.path, s.signedUrl);
+    }
+  }
+  return (raw: string | null | undefined): string | null => {
+    if (!raw) return null;
+    if (/^https?:\/\//i.test(raw)) return raw;
+    return signedByPath.get(raw) ?? null;
+  };
+}
+
 async function fetchStandings(competitionId: string) {
   const { data, error } = await supabase
     .from("standings")
@@ -32,7 +62,7 @@ async function fetchStandings(competitionId: string) {
   if (error) throw error;
 
   const rows = (data ?? []) as StandingRow[];
-  if (rows.length === 0) return { season: null as string | null, rows };
+  if (rows.length === 0) return { season: null as string | null, rows, logos: [] as (string | null)[] };
 
   // Keep only the most recently computed season for this competition.
   const latest = rows.reduce<StandingRow>((acc, r) => {
@@ -40,10 +70,21 @@ async function fetchStandings(competitionId: string) {
     const b = r.computed_at ?? "";
     return b > a ? r : acc;
   }, rows[0]!);
+  const seasonRows = rows.filter((r) => r.season === latest.season);
+  const logoUrl = await signLogos(seasonRows);
   return {
     season: latest.season,
-    rows: rows.filter((r) => r.season === latest.season),
+    rows: seasonRows,
+    logos: seasonRows.map((r) => logoUrl(r.teams?.logo_url)),
   };
+}
+
+function Num({ children }: { children: React.ReactNode }) {
+  return (
+    <span dir="ltr" className="tabular-nums">
+      {children}
+    </span>
+  );
 }
 
 export function StandingsSheet({
@@ -79,69 +120,79 @@ export function StandingsSheet({
           </SheetTitle>
         </SheetHeader>
 
-        <div className="px-4 pb-6">
+        <div className="px-4 pb-8">
           {isLoading ? (
             <div className="space-y-2">
               {Array.from({ length: 8 }).map((_, i) => (
-                <SkeletonBlock key={i} className="h-9" />
+                <SkeletonBlock key={i} className="h-12" />
               ))}
             </div>
           ) : rows.length < MIN_ROWS ? (
             <EmptyState text="הטבלה תתעדכן עם תחילת העונה" />
           ) : (
-            <table className="w-full text-xs">
+            <table className="w-full table-fixed text-[13px]">
+              <colgroup>
+                <col className="w-7" />
+                <col />
+                <col className="w-9" />
+                <col className="w-9" />
+                <col className="w-9" />
+                <col className="w-9" />
+                <col className="w-11" />
+                <col className="w-11" />
+              </colgroup>
               <thead>
-                <tr className="text-muted-foreground">
-                  <th className="py-2 text-start font-medium">#</th>
-                  <th className="py-2 text-start font-medium">קבוצה</th>
-                  <th className="py-2 text-center font-medium">מש׳</th>
-                  <th className="py-2 text-center font-medium">נצ׳</th>
-                  <th className="py-2 text-center font-medium">תי׳</th>
-                  <th className="py-2 text-center font-medium">הפ׳</th>
-                  <th className="py-2 text-center font-medium">שערים</th>
-                  <th className="py-2 text-center font-medium">הפרש</th>
-                  <th className="py-2 text-center font-medium">נק׳</th>
+                <tr className="text-[11px] text-muted-foreground">
+                  <th className="pb-3 text-start font-medium">#</th>
+                  <th className="pb-3 ps-2 text-start font-medium">קבוצה</th>
+                  <th className="pb-3 text-center font-medium">מש׳</th>
+                  <th className="pb-3 text-center font-medium">נצ׳</th>
+                  <th className="pb-3 text-center font-medium">תי׳</th>
+                  <th className="pb-3 text-center font-medium">הפ׳</th>
+                  <th className="pb-3 text-center font-medium">הפרש</th>
+                  <th className="pb-3 text-center font-medium">נק׳</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={`${r.position}-${i}`} className="border-t border-border">
-                    <td className="py-2 text-start text-muted-foreground">
-                      <span dir="ltr">{r.position ?? i + 1}</span>
+                    <td className="py-3 text-start text-xs text-muted-foreground">
+                      <Num>{r.position ?? i + 1}</Num>
                     </td>
-                    <td className="py-2">
-                      <div className="flex items-center gap-2">
+                    <td className="py-3 ps-2">
+                      <div className="flex items-center gap-2.5">
                         <LogoSlot
-                          className="size-6"
-                          logoUrl={r.teams?.logo_url ?? null}
+                          className="size-7"
+                          logoUrl={data?.logos?.[i] ?? null}
                           name={r.teams?.name_he ?? r.teams?.name_en ?? null}
                         />
-
                         <span className="truncate">
                           {r.teams?.name_he ?? r.teams?.name_en ?? "—"}
                         </span>
                       </div>
                     </td>
-                    <td className="py-2 text-center">
-                      <span dir="ltr">{r.played ?? 0}</span>
+                    <td className="py-3 text-center text-muted-foreground">
+                      <Num>{r.played ?? 0}</Num>
                     </td>
-                    <td className="py-2 text-center">
-                      <span dir="ltr">{r.won ?? 0}</span>
+                    <td className="py-3 text-center">
+                      <Num>{r.won ?? 0}</Num>
                     </td>
-                    <td className="py-2 text-center">
-                      <span dir="ltr">{r.drawn ?? 0}</span>
+                    <td className="py-3 text-center">
+                      <Num>{r.drawn ?? 0}</Num>
                     </td>
-                    <td className="py-2 text-center">
-                      <span dir="ltr">{r.lost ?? 0}</span>
+                    <td className="py-3 text-center">
+                      <Num>{r.lost ?? 0}</Num>
                     </td>
-                    <td className="py-2 text-center">
-                      <span dir="ltr">{`${r.goals_against ?? 0}:${r.goals_for ?? 0}`}</span>
+                    <td className="py-3 text-center text-muted-foreground">
+                      <Num>{r.goal_diff ?? 0}</Num>
                     </td>
-                    <td className="py-2 text-center">
-                      <span dir="ltr">{r.goal_diff ?? 0}</span>
-                    </td>
-                    <td className="py-2 text-center font-bold">
-                      <span dir="ltr">{r.points ?? 0}</span>
+                    <td className="py-3 text-center">
+                      <span
+                        dir="ltr"
+                        className="inline-block min-w-7 rounded-lg bg-surface-2 px-1.5 py-0.5 font-bold tabular-nums text-brand-3"
+                      >
+                        {r.points ?? 0}
+                      </span>
                     </td>
                   </tr>
                 ))}
