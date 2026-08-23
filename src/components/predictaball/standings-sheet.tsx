@@ -160,13 +160,13 @@ export function StandingsSheet({
                       <Num>{r.position ?? i + 1}</Num>
                     </td>
                     <td className="py-3 ps-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex w-full items-center gap-2">
                         <LogoSlot
                           className="size-7"
                           logoUrl={data?.logos?.[i] ?? null}
                           name={r.teams?.name_he ?? r.teams?.name_en ?? null}
                         />
-                        <span className="truncate">
+                        <span className="min-w-0 flex-1 truncate text-start">
                           {r.teams?.name_he ?? r.teams?.name_en ?? "—"}
                         </span>
                       </div>
