@@ -192,8 +192,14 @@ function AuthPage() {
     setBusy(true);
     try {
       if (mode === "signin") {
+        const { blocked } = await isEmailBlocked({ data: { email } });
+        if (blocked) {
+          setError("החשבון הזה חסום. פנה למנהל.");
+          return;
+        }
         const { error: err } = await supabase.auth.signInWithPassword({ email, password });
         if (err) setError(toHebrewError(err.message));
+
       } else if (mode === "signup") {
         const { data, error: err } = await supabase.auth.signUp({
           email,
