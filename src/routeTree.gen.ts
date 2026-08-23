@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedAccuracyRouteImport } from './routes/_authenticated/accuracy'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedNewsRouteImport } from './routes/_authenticated/news'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedMatchIdRouteImport } from './routes/_authenticated/match.$id'
@@ -51,6 +52,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
 const AuthenticatedAccuracyRoute = AuthenticatedAccuracyRouteImport.update({
   id: '/accuracy',
   path: '/accuracy',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedNewsRoute = AuthenticatedNewsRouteImport.update({
@@ -136,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/accuracy': typeof AuthenticatedAccuracyRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/news': typeof AuthenticatedNewsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/match/$id': typeof AuthenticatedMatchIdRoute
@@ -155,6 +162,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/accuracy': typeof AuthenticatedAccuracyRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/news': typeof AuthenticatedNewsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/': typeof AuthenticatedIndexRoute
@@ -177,6 +185,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/accuracy': typeof AuthenticatedAccuracyRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/news': typeof AuthenticatedNewsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
@@ -200,6 +209,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/accuracy'
+    | '/admin'
     | '/news'
     | '/settings'
     | '/match/$id'
@@ -219,6 +229,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/accuracy'
+    | '/admin'
     | '/news'
     | '/settings'
     | '/'
@@ -240,6 +251,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/_authenticated/accuracy'
+    | '/_authenticated/admin'
     | '/_authenticated/news'
     | '/_authenticated/settings'
     | '/_authenticated/'
@@ -309,6 +321,13 @@ declare module '@tanstack/react-router' {
       path: '/accuracy'
       fullPath: '/accuracy'
       preLoaderRoute: typeof AuthenticatedAccuracyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/news': {
@@ -414,6 +433,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccuracyRoute: typeof AuthenticatedAccuracyRoute
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedNewsRoute: typeof AuthenticatedNewsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
@@ -422,6 +442,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccuracyRoute: AuthenticatedAccuracyRoute,
+  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedNewsRoute: AuthenticatedNewsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,

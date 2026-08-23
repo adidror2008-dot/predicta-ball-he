@@ -7,6 +7,8 @@ import { EmptyState, SectionTitle, SkeletonBlock } from "@/components/predictaba
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { ensurePushSubscription, needsIosHomeScreen } from "@/lib/push-client";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
@@ -116,9 +118,11 @@ function useFollowedMatches() {
 
       const { data: matches } = await supabase
         .from("matches")
-        .select("id, kickoff_at, home_team_id, away_team_id")
+        .select("id, kickoff_at, home_team_id, away_team_id, status")
         .in("id", ids)
+        .not("status", "eq", "finished")
         .order("kickoff_at", { ascending: true });
+
 
       const teamIds = [
         ...new Set(
@@ -153,7 +157,25 @@ function useFollowedMatches() {
   });
 }
 
+function AdminLink() {
+  const { isAdmin } = useIsAdmin();
+  if (!isAdmin) return null;
+  return (
+    <section>
+      <SectionTitle>ניהול</SectionTitle>
+      <Link
+        to="/admin"
+        className="flex items-center justify-between rounded-2xl bg-card p-4 shadow-card"
+      >
+        <span className="text-sm font-medium">ניהול משתמשים</span>
+        <ChevronLeft className="size-4 text-muted-foreground" aria-hidden />
+      </Link>
+    </section>
+  );
+}
+
 function SettingsScreen() {
+
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -336,6 +358,8 @@ function SettingsScreen() {
         )}
       </section>
 
+      <AdminLink />
+
       <section>
         <SectionTitle>המודל</SectionTitle>
         <Link
@@ -346,6 +370,7 @@ function SettingsScreen() {
           <ChevronLeft className="size-4 text-muted-foreground" aria-hidden />
         </Link>
       </section>
+
 
       <section>
         <SectionTitle>אודות</SectionTitle>
