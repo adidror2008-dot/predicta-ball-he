@@ -39,3 +39,10 @@ export const getModelAccuracyFn = createServerFn({ method: "POST" }).handler(asy
   const { getModelAccuracy } = await import("@/lib/match-details-read.server");
   return getModelAccuracy();
 });
+
+export const getMatchStatsFn = createServerFn({ method: "POST" })
+  .inputValidator((input: { matchExternalId: string }) => input)
+  .handler(async ({ data }) => {
+    const { getMatchStats } = await import("@/lib/match-details-read.server");
+    return getMatchStats(data.matchExternalId);
+  });
