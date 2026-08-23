@@ -109,13 +109,20 @@ function MatchesPanel({
     minute: m.minute ?? null,
   });
 
-  const { finished, upcoming } = useMemo(() => {
+  const { finished, upcoming, postponed } = useMemo(() => {
     const sorted = [...matches].sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt));
     return {
       finished: sorted.filter((m) => toStatus(m.status) === "finished").map(toCard),
-      upcoming: sorted.filter((m) => toStatus(m.status) !== "finished").map(toCard),
+      upcoming: sorted
+        .filter((m) => {
+          const s = toStatus(m.status);
+          return s !== "finished" && s !== "postponed";
+        })
+        .map(toCard),
+      postponed: sorted.filter((m) => toStatus(m.status) === "postponed").map(toCard),
     };
   }, [matches]);
+
 
   const seasonNotice = useMemo(() => {
     const first = matches.find((m) => !m.isCurrentSeason && m.seasonLabel);
