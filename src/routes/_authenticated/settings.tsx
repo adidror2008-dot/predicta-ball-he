@@ -155,7 +155,25 @@ function useFollowedMatches() {
   });
 }
 
+function AdminLink() {
+  const { isAdmin } = useIsAdmin();
+  if (!isAdmin) return null;
+  return (
+    <section>
+      <SectionTitle>ניהול</SectionTitle>
+      <Link
+        to="/admin"
+        className="flex items-center justify-between rounded-2xl bg-card p-4 shadow-card"
+      >
+        <span className="text-sm font-medium">ניהול משתמשים</span>
+        <ChevronLeft className="size-4 text-muted-foreground" aria-hidden />
+      </Link>
+    </section>
+  );
+}
+
 function SettingsScreen() {
+
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isSigningOut, setIsSigningOut] = useState(false);
