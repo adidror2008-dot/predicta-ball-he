@@ -120,7 +120,7 @@ export function StandingsSheet({
           </SheetTitle>
         </SheetHeader>
 
-        <div className="px-4 pb-8">
+        <div className="px-3 pb-8">
           {isLoading ? (
             <div className="space-y-2">
               {Array.from({ length: 8 }).map((_, i) => (
@@ -132,14 +132,14 @@ export function StandingsSheet({
           ) : (
             <table className="w-full table-fixed text-[13px]">
               <colgroup>
-                <col className="w-7" />
+                <col className="w-5" />
                 <col />
+                <col className="w-7" />
+                <col className="w-7" />
+                <col className="w-7" />
+                <col className="w-7" />
                 <col className="w-9" />
-                <col className="w-9" />
-                <col className="w-9" />
-                <col className="w-9" />
-                <col className="w-11" />
-                <col className="w-11" />
+                <col className="w-10" />
               </colgroup>
               <thead>
                 <tr className="text-[11px] text-muted-foreground">
@@ -160,7 +160,7 @@ export function StandingsSheet({
                       <Num>{r.position ?? i + 1}</Num>
                     </td>
                     <td className="py-3 ps-2">
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2">
                         <LogoSlot
                           className="size-7"
                           logoUrl={data?.logos?.[i] ?? null}
