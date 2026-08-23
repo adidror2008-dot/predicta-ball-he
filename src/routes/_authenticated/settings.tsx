@@ -116,9 +116,11 @@ function useFollowedMatches() {
 
       const { data: matches } = await supabase
         .from("matches")
-        .select("id, kickoff_at, home_team_id, away_team_id")
+        .select("id, kickoff_at, home_team_id, away_team_id, status")
         .in("id", ids)
+        .not("status", "eq", "finished")
         .order("kickoff_at", { ascending: true });
+
 
       const teamIds = [
         ...new Set(
