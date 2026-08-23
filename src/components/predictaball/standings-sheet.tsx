@@ -113,9 +113,10 @@ export function StandingsSheet({
                       <div className="flex items-center gap-2">
                         <LogoSlot
                           className="size-6"
-                          logoUrl={r.teams?.logo_url}
-                          name={r.teams?.name_he ?? r.teams?.name_en}
+                          logoUrl={r.teams?.logo_url ?? null}
+                          name={r.teams?.name_he ?? r.teams?.name_en ?? null}
                         />
+
                         <span className="truncate">
                           {r.teams?.name_he ?? r.teams?.name_en ?? "—"}
                         </span>
