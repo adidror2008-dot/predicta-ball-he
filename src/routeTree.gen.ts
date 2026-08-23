@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as TmpStandingsPreviewRouteImport } from './routes/tmp-standings-preview'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedAccuracyRouteImport } from './routes/_authenticated/accuracy'
 import { Route as AuthenticatedNewsRouteImport } from './routes/_authenticated/news'
@@ -41,6 +42,11 @@ const AuthRoute = AuthRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TmpStandingsPreviewRoute = TmpStandingsPreviewRouteImport.update({
+  id: '/tmp-standings-preview',
+  path: '/tmp-standings-preview',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/tmp-standings-preview': typeof TmpStandingsPreviewRoute
   '/accuracy': typeof AuthenticatedAccuracyRoute
   '/news': typeof AuthenticatedNewsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -154,6 +161,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/tmp-standings-preview': typeof TmpStandingsPreviewRoute
   '/accuracy': typeof AuthenticatedAccuracyRoute
   '/news': typeof AuthenticatedNewsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -176,6 +184,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/tmp-standings-preview': typeof TmpStandingsPreviewRoute
   '/_authenticated/accuracy': typeof AuthenticatedAccuracyRoute
   '/_authenticated/news': typeof AuthenticatedNewsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -199,6 +208,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/reset-password'
+    | '/tmp-standings-preview'
     | '/accuracy'
     | '/news'
     | '/settings'
@@ -218,6 +228,7 @@ export interface FileRouteTypes {
   to:
     | '/auth'
     | '/reset-password'
+    | '/tmp-standings-preview'
     | '/accuracy'
     | '/news'
     | '/settings'
@@ -239,6 +250,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/reset-password'
+    | '/tmp-standings-preview'
     | '/_authenticated/accuracy'
     | '/_authenticated/news'
     | '/_authenticated/settings'
@@ -261,6 +273,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  TmpStandingsPreviewRoute: typeof TmpStandingsPreviewRoute
   ApiCronRefreshRoute: typeof ApiCronRefreshRoute
   ApiPublicComputeStandingsRoute: typeof ApiPublicComputeStandingsRoute
   ApiPublicDiscoverSeasonsRoute: typeof ApiPublicDiscoverSeasonsRoute
@@ -295,6 +308,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tmp-standings-preview': {
+      id: '/tmp-standings-preview'
+      path: '/tmp-standings-preview'
+      fullPath: '/tmp-standings-preview'
+      preLoaderRoute: typeof TmpStandingsPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
@@ -435,6 +455,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  TmpStandingsPreviewRoute: TmpStandingsPreviewRoute,
   ApiCronRefreshRoute: ApiCronRefreshRoute,
   ApiPublicComputeStandingsRoute: ApiPublicComputeStandingsRoute,
   ApiPublicDiscoverSeasonsRoute: ApiPublicDiscoverSeasonsRoute,
