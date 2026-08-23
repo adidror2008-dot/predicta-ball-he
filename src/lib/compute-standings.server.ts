@@ -26,7 +26,7 @@ export type CompetitionStandingsResult = {
   teams: number;
   rows_written: number;
   skipped: boolean;
-  reason?: "less_than_10_teams" | "no_finished_matches";
+  reason?: "less_than_10_teams" | "no_finished_matches" | "not_a_league";
 };
 
 type Agg = {
@@ -58,11 +58,25 @@ export async function runComputeStandings(): Promise<{
   try {
     const { data: comps, error: compsError } = await supabaseAdmin
       .from("competitions")
-      .select("id, name_he, season_calc_method")
+      .select("id, name_he, season_calc_method, display_type")
       .eq("is_active", true);
     if (compsError) throw compsError;
 
     for (const comp of comps ?? []) {
+      // Only true league competitions get a table. Cups (including UCL/UEL,
+      // which are mostly qualifiers) would produce a misleading standings table.
+      if (comp.display_type !== "league") {
+        results.push({
+          competition_id: comp.id,
+          name_he: comp.name_he,
+          season: "",
+          teams: 0,
+          rows_written: 0,
+          skipped: true,
+          reason: "not_a_league",
+        });
+        continue;
+      }
       // Season is derived from the database's own single source of truth,
       // the same compute_season() used by the matches trigger.
       const { data: seasonRaw, error: seasonError } = await supabaseAdmin.rpc("compute_season", {
