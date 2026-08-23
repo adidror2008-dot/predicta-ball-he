@@ -24,6 +24,7 @@ import { Route as ApiPublicFetchNewsRouteImport } from './routes/api/public/fetc
 import { Route as ApiPublicFetchPlayerPhotosRouteImport } from './routes/api/public/fetch-player-photos'
 import { Route as ApiPublicFetchTeamHistoryRouteImport } from './routes/api/public/fetch-team-history'
 import { Route as ApiPublicFetchTeamLogosRouteImport } from './routes/api/public/fetch-team-logos'
+import { Route as ApiPublicRunPredictionsOnceRouteImport } from './routes/api/public/run-predictions-once'
 import { Route as ApiPublicSyncCompetitionsRouteImport } from './routes/api/public/sync-competitions'
 import { Route as ApiPublicSyncFixturesDailyRouteImport } from './routes/api/public/sync-fixtures-daily'
 import { Route as ApiPublicTickRouteImport } from './routes/api/public/tick'
@@ -107,6 +108,12 @@ const ApiPublicFetchTeamLogosRoute = ApiPublicFetchTeamLogosRouteImport.update({
   path: '/api/public/fetch-team-logos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicRunPredictionsOnceRoute =
+  ApiPublicRunPredictionsOnceRouteImport.update({
+    id: '/api/public/run-predictions-once',
+    path: '/api/public/run-predictions-once',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicSyncCompetitionsRoute =
   ApiPublicSyncCompetitionsRouteImport.update({
     id: '/api/public/sync-competitions',
@@ -146,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/api/public/fetch-player-photos': typeof ApiPublicFetchPlayerPhotosRoute
   '/api/public/fetch-team-history': typeof ApiPublicFetchTeamHistoryRoute
   '/api/public/fetch-team-logos': typeof ApiPublicFetchTeamLogosRoute
+  '/api/public/run-predictions-once': typeof ApiPublicRunPredictionsOnceRoute
   '/api/public/sync-competitions': typeof ApiPublicSyncCompetitionsRoute
   '/api/public/sync-fixtures-daily': typeof ApiPublicSyncFixturesDailyRoute
   '/api/public/tick': typeof ApiPublicTickRoute
@@ -166,6 +174,7 @@ export interface FileRoutesByTo {
   '/api/public/fetch-player-photos': typeof ApiPublicFetchPlayerPhotosRoute
   '/api/public/fetch-team-history': typeof ApiPublicFetchTeamHistoryRoute
   '/api/public/fetch-team-logos': typeof ApiPublicFetchTeamLogosRoute
+  '/api/public/run-predictions-once': typeof ApiPublicRunPredictionsOnceRoute
   '/api/public/sync-competitions': typeof ApiPublicSyncCompetitionsRoute
   '/api/public/sync-fixtures-daily': typeof ApiPublicSyncFixturesDailyRoute
   '/api/public/tick': typeof ApiPublicTickRoute
@@ -188,6 +197,7 @@ export interface FileRoutesById {
   '/api/public/fetch-player-photos': typeof ApiPublicFetchPlayerPhotosRoute
   '/api/public/fetch-team-history': typeof ApiPublicFetchTeamHistoryRoute
   '/api/public/fetch-team-logos': typeof ApiPublicFetchTeamLogosRoute
+  '/api/public/run-predictions-once': typeof ApiPublicRunPredictionsOnceRoute
   '/api/public/sync-competitions': typeof ApiPublicSyncCompetitionsRoute
   '/api/public/sync-fixtures-daily': typeof ApiPublicSyncFixturesDailyRoute
   '/api/public/tick': typeof ApiPublicTickRoute
@@ -210,6 +220,7 @@ export interface FileRouteTypes {
     | '/api/public/fetch-player-photos'
     | '/api/public/fetch-team-history'
     | '/api/public/fetch-team-logos'
+    | '/api/public/run-predictions-once'
     | '/api/public/sync-competitions'
     | '/api/public/sync-fixtures-daily'
     | '/api/public/tick'
@@ -230,6 +241,7 @@ export interface FileRouteTypes {
     | '/api/public/fetch-player-photos'
     | '/api/public/fetch-team-history'
     | '/api/public/fetch-team-logos'
+    | '/api/public/run-predictions-once'
     | '/api/public/sync-competitions'
     | '/api/public/sync-fixtures-daily'
     | '/api/public/tick'
@@ -251,6 +263,7 @@ export interface FileRouteTypes {
     | '/api/public/fetch-player-photos'
     | '/api/public/fetch-team-history'
     | '/api/public/fetch-team-logos'
+    | '/api/public/run-predictions-once'
     | '/api/public/sync-competitions'
     | '/api/public/sync-fixtures-daily'
     | '/api/public/tick'
@@ -268,6 +281,7 @@ export interface RootRouteChildren {
   ApiPublicFetchPlayerPhotosRoute: typeof ApiPublicFetchPlayerPhotosRoute
   ApiPublicFetchTeamHistoryRoute: typeof ApiPublicFetchTeamHistoryRoute
   ApiPublicFetchTeamLogosRoute: typeof ApiPublicFetchTeamLogosRoute
+  ApiPublicRunPredictionsOnceRoute: typeof ApiPublicRunPredictionsOnceRoute
   ApiPublicSyncCompetitionsRoute: typeof ApiPublicSyncCompetitionsRoute
   ApiPublicSyncFixturesDailyRoute: typeof ApiPublicSyncFixturesDailyRoute
   ApiPublicTickRoute: typeof ApiPublicTickRoute
@@ -381,6 +395,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicFetchTeamLogosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/run-predictions-once': {
+      id: '/api/public/run-predictions-once'
+      path: '/api/public/run-predictions-once'
+      fullPath: '/api/public/run-predictions-once'
+      preLoaderRoute: typeof ApiPublicRunPredictionsOnceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/sync-competitions': {
       id: '/api/public/sync-competitions'
       path: '/api/public/sync-competitions'
@@ -442,6 +463,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicFetchPlayerPhotosRoute: ApiPublicFetchPlayerPhotosRoute,
   ApiPublicFetchTeamHistoryRoute: ApiPublicFetchTeamHistoryRoute,
   ApiPublicFetchTeamLogosRoute: ApiPublicFetchTeamLogosRoute,
+  ApiPublicRunPredictionsOnceRoute: ApiPublicRunPredictionsOnceRoute,
   ApiPublicSyncCompetitionsRoute: ApiPublicSyncCompetitionsRoute,
   ApiPublicSyncFixturesDailyRoute: ApiPublicSyncFixturesDailyRoute,
   ApiPublicTickRoute: ApiPublicTickRoute,
