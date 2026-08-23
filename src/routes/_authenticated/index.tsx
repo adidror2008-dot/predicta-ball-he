@@ -44,6 +44,7 @@ const SCROLL_OFFSET = 12;
 const PAST_MATCHES_ABOVE = 2;
 
 function toStatus(status: string | null): MatchStatus {
+  if (status === "postponed") return "postponed";
   if (status === "finished" || status === "ended" || status === "afterET" || status === "ap") {
     return "finished";
   }
@@ -108,13 +109,20 @@ function MatchesPanel({
     minute: m.minute ?? null,
   });
 
-  const { finished, upcoming } = useMemo(() => {
+  const { finished, upcoming, postponed } = useMemo(() => {
     const sorted = [...matches].sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt));
     return {
       finished: sorted.filter((m) => toStatus(m.status) === "finished").map(toCard),
-      upcoming: sorted.filter((m) => toStatus(m.status) !== "finished").map(toCard),
+      upcoming: sorted
+        .filter((m) => {
+          const s = toStatus(m.status);
+          return s !== "finished" && s !== "postponed";
+        })
+        .map(toCard),
+      postponed: sorted.filter((m) => toStatus(m.status) === "postponed").map(toCard),
     };
   }, [matches]);
+
 
   const seasonNotice = useMemo(() => {
     const first = matches.find((m) => !m.isCurrentSeason && m.seasonLabel);
@@ -151,7 +159,7 @@ function MatchesPanel({
     );
   }
 
-  if (finished.length === 0 && upcoming.length === 0) {
+  if (finished.length === 0 && upcoming.length === 0 && postponed.length === 0) {
     return <EmptyState text="אין משחקים להצגה כרגע" />;
   }
 
@@ -176,6 +184,18 @@ function MatchesPanel({
       ) : null}
 
       {upcoming.map((m) => (
+        <MatchCard key={m.id} match={m} />
+      ))}
+
+      {postponed.length > 0 ? (
+        <div className="flex items-center gap-3 py-1">
+          <span className="h-px flex-1 bg-border" aria-hidden />
+          <span className="text-xs font-medium text-muted-foreground">משחקים שנדחו</span>
+          <span className="h-px flex-1 bg-border" aria-hidden />
+        </div>
+      ) : null}
+
+      {postponed.map((m) => (
         <MatchCard key={m.id} match={m} />
       ))}
     </div>

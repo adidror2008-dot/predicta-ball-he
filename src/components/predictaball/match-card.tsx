@@ -4,7 +4,7 @@ import { MatchFollowBell } from "./follow-bell";
 import { LtrNum, LogoSlot } from "./ui-bits";
 import { cn } from "@/lib/utils";
 
-export type MatchStatus = "scheduled" | "live" | "finished";
+export type MatchStatus = "scheduled" | "live" | "finished" | "postponed";
 
 export type MatchCardData = {
   id: string;
@@ -25,18 +25,23 @@ const statusLabel: Record<MatchStatus, string> = {
   scheduled: "טרם החל",
   live: "משחק חי",
   finished: "הסתיים",
+  postponed: "נדחה",
 };
 
 const statusClass: Record<MatchStatus, string> = {
   scheduled: "bg-surface-2 text-muted-foreground",
   live: "bg-status-loss/15 text-status-loss",
   finished: "bg-status-draw/20 text-muted-foreground",
+  postponed: "bg-status-draw/25 text-status-draw",
 };
 
 export function MatchCard({ match }: { match: MatchCardData }) {
-  const hasScore = match.homeScore !== null && match.awayScore !== null;
+  const isPostponed = match.status === "postponed";
+  const hasScore =
+    !isPostponed && match.homeScore !== null && match.awayScore !== null;
   const isFuture = match.status === "scheduled";
   const isFinished = match.status === "finished";
+
 
   return (
     <Link
@@ -58,7 +63,7 @@ export function MatchCard({ match }: { match: MatchCardData }) {
           {statusLabel[match.status]}
         </span>
         <div className="flex items-center gap-2">
-          {!isFuture && match.date ? (
+          {!isFuture && !isPostponed && match.date ? (
             <LtrNum className="text-[11px] text-muted-foreground">{match.date}</LtrNum>
           ) : null}
         </div>
@@ -71,8 +76,12 @@ export function MatchCard({ match }: { match: MatchCardData }) {
           <span className="min-w-0 flex-1 truncate whitespace-nowrap text-start text-sm font-medium">{match.homeName}</span>
         </div>
 
-        <div className="w-14 shrink-0 text-center">
-          {hasScore ? (
+        <div className={cn("shrink-0 text-center", isPostponed ? "w-24" : "w-14")}>
+          {isPostponed ? (
+            <span className="block text-[11px] leading-tight text-muted-foreground">
+              מועד חדש טרם נקבע
+            </span>
+          ) : hasScore ? (
             <div className="flex flex-col items-center gap-0.5">
               {match.status === "live" && match.minute != null ? (
                 <LtrNum className="text-[11px] font-semibold text-status-loss">
