@@ -217,7 +217,6 @@ export function computePrediction(
   }
 
   let probHome = 0, probDraw = 0, probAway = 0;
-  let bestI = 0, bestJ = 0, bestP = -1;
   let prob01 = 0, prob23 = 0, probOver25 = 0, probBtts = 0;
   for (let i = 0; i <= grid; i++) {
     for (let j = 0; j <= grid; j++) {
@@ -225,7 +224,6 @@ export function computePrediction(
       if (i > j) probHome += p;
       else if (i === j) probDraw += p;
       else probAway += p;
-      if (p > bestP) { bestP = p; bestI = i; bestJ = j; }
       const total = i + j;
       if (total <= 1) prob01 += p;
       else if (total <= 3) prob23 += p;
@@ -235,6 +233,32 @@ export function computePrediction(
   }
   const prob4Plus = 1 - prob01 - prob23;
   const probUnder25 = 1 - probOver25;
+
+  // The displayed exact score must agree with the 1X2 winner: pick the most
+  // likely cell among the cells matching the most likely outcome.
+  // Tie-break: fewer total goals, then the home side.
+  const outcome: 'home' | 'draw' | 'away' =
+    probHome >= probDraw && probHome >= probAway
+      ? 'home'
+      : probAway >= probDraw
+        ? 'away'
+        : 'draw';
+  let bestI = 0, bestJ = 0, bestP = -1;
+  for (let i = 0; i <= grid; i++) {
+    for (let j = 0; j <= grid; j++) {
+      const matches = outcome === 'home' ? i > j : outcome === 'away' ? i < j : i === j;
+      if (!matches) continue;
+      const p = matrix[i]![j]!;
+      const total = i + j;
+      const bestTotal = bestI + bestJ;
+      const better =
+        bestP < 0 ||
+        p > bestP ||
+        (p === bestP && (total < bestTotal || (total === bestTotal && i > bestI)));
+      if (better) { bestP = p; bestI = i; bestJ = j; }
+    }
+  }
+
 
   const buckets: Record<'0-1' | '2-3' | '4+', number> = { '0-1': prob01, '2-3': prob23, '4+': prob4Plus };
   const predictedGoalBucket = (Object.keys(buckets) as Array<'0-1' | '2-3' | '4+'>)
