@@ -338,6 +338,8 @@ function SettingsScreen() {
         )}
       </section>
 
+      <AdminLink />
+
       <section>
         <SectionTitle>המודל</SectionTitle>
         <Link
@@ -348,6 +350,7 @@ function SettingsScreen() {
           <ChevronLeft className="size-4 text-muted-foreground" aria-hidden />
         </Link>
       </section>
+
 
       <section>
         <SectionTitle>אודות</SectionTitle>
