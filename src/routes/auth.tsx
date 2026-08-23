@@ -5,6 +5,8 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { cn } from "@/lib/utils";
+import { isEmailBlocked } from "@/lib/admin.functions";
+
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
