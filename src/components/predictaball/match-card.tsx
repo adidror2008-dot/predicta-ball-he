@@ -4,7 +4,7 @@ import { MatchFollowBell } from "./follow-bell";
 import { LtrNum, LogoSlot } from "./ui-bits";
 import { cn } from "@/lib/utils";
 
-export type MatchStatus = "scheduled" | "live" | "finished";
+export type MatchStatus = "scheduled" | "live" | "finished" | "postponed";
 
 export type MatchCardData = {
   id: string;
@@ -25,18 +25,23 @@ const statusLabel: Record<MatchStatus, string> = {
   scheduled: "טרם החל",
   live: "משחק חי",
   finished: "הסתיים",
+  postponed: "נדחה",
 };
 
 const statusClass: Record<MatchStatus, string> = {
   scheduled: "bg-surface-2 text-muted-foreground",
   live: "bg-status-loss/15 text-status-loss",
   finished: "bg-status-draw/20 text-muted-foreground",
+  postponed: "bg-status-draw/25 text-status-draw",
 };
 
 export function MatchCard({ match }: { match: MatchCardData }) {
-  const hasScore = match.homeScore !== null && match.awayScore !== null;
+  const isPostponed = match.status === "postponed";
+  const hasScore =
+    !isPostponed && match.homeScore !== null && match.awayScore !== null;
   const isFuture = match.status === "scheduled";
   const isFinished = match.status === "finished";
+
 
   return (
     <Link
