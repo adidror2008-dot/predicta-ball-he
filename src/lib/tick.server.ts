@@ -150,11 +150,12 @@ export async function runTick(): Promise<TickResult> {
   // ---- STEP 1b: lineup pre-fetch candidates (kickoff in 55-65 minutes, no lineups yet)
   const { data: lineupWindowMatches } = await supabaseAdmin
     .from("matches")
-    .select("id, external_id, kickoff_at")
+    .select("id, external_id, kickoff_at, status")
     .eq("source", SOURCE)
     .not("external_id", "is", null)
     .gte("kickoff_at", new Date(now + LINEUP_WINDOW_MIN_MS).toISOString())
     .lte("kickoff_at", new Date(now + LINEUP_WINDOW_MAX_MS).toISOString())
+    .not("status", "in", `(${FINAL_STATUS_TYPES.join(",")})`)
     .order("kickoff_at", { ascending: true })
     .limit(20);
 
