@@ -18,6 +18,7 @@ import { Route as AuthenticatedNewsRouteImport } from './routes/_authenticated/n
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedMatchIdRouteImport } from './routes/_authenticated/match.$id'
 import { Route as ApiCronRefreshRouteImport } from './routes/api/cron/refresh'
+import { Route as ApiPublicComputeStandingsRouteImport } from './routes/api/public/compute-standings'
 import { Route as ApiPublicDiscoverSeasonsRouteImport } from './routes/api/public/discover-seasons'
 import { Route as ApiPublicFetchNewsRouteImport } from './routes/api/public/fetch-news'
 import { Route as ApiPublicFetchPlayerPhotosRouteImport } from './routes/api/public/fetch-player-photos'
@@ -71,6 +72,12 @@ const ApiCronRefreshRoute = ApiCronRefreshRouteImport.update({
   path: '/api/cron/refresh',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicComputeStandingsRoute =
+  ApiPublicComputeStandingsRouteImport.update({
+    id: '/api/public/compute-standings',
+    path: '/api/public/compute-standings',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicDiscoverSeasonsRoute =
   ApiPublicDiscoverSeasonsRouteImport.update({
     id: '/api/public/discover-seasons',
@@ -127,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/match/$id': typeof AuthenticatedMatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
+  '/api/public/compute-standings': typeof ApiPublicComputeStandingsRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
   '/api/public/fetch-news': typeof ApiPublicFetchNewsRoute
   '/api/public/fetch-player-photos': typeof ApiPublicFetchPlayerPhotosRoute
@@ -145,6 +153,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/match/$id': typeof AuthenticatedMatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
+  '/api/public/compute-standings': typeof ApiPublicComputeStandingsRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
   '/api/public/fetch-news': typeof ApiPublicFetchNewsRoute
   '/api/public/fetch-player-photos': typeof ApiPublicFetchPlayerPhotosRoute
@@ -165,6 +174,7 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/match/$id': typeof AuthenticatedMatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
+  '/api/public/compute-standings': typeof ApiPublicComputeStandingsRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
   '/api/public/fetch-news': typeof ApiPublicFetchNewsRoute
   '/api/public/fetch-player-photos': typeof ApiPublicFetchPlayerPhotosRoute
@@ -185,6 +195,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/match/$id'
     | '/api/cron/refresh'
+    | '/api/public/compute-standings'
     | '/api/public/discover-seasons'
     | '/api/public/fetch-news'
     | '/api/public/fetch-player-photos'
@@ -203,6 +214,7 @@ export interface FileRouteTypes {
     | '/'
     | '/match/$id'
     | '/api/cron/refresh'
+    | '/api/public/compute-standings'
     | '/api/public/discover-seasons'
     | '/api/public/fetch-news'
     | '/api/public/fetch-player-photos'
@@ -222,6 +234,7 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/match/$id'
     | '/api/cron/refresh'
+    | '/api/public/compute-standings'
     | '/api/public/discover-seasons'
     | '/api/public/fetch-news'
     | '/api/public/fetch-player-photos'
@@ -237,6 +250,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ApiCronRefreshRoute: typeof ApiCronRefreshRoute
+  ApiPublicComputeStandingsRoute: typeof ApiPublicComputeStandingsRoute
   ApiPublicDiscoverSeasonsRoute: typeof ApiPublicDiscoverSeasonsRoute
   ApiPublicFetchNewsRoute: typeof ApiPublicFetchNewsRoute
   ApiPublicFetchPlayerPhotosRoute: typeof ApiPublicFetchPlayerPhotosRoute
@@ -310,6 +324,13 @@ declare module '@tanstack/react-router' {
       path: '/api/cron/refresh'
       fullPath: '/api/cron/refresh'
       preLoaderRoute: typeof ApiCronRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/compute-standings': {
+      id: '/api/public/compute-standings'
+      path: '/api/public/compute-standings'
+      fullPath: '/api/public/compute-standings'
+      preLoaderRoute: typeof ApiPublicComputeStandingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/discover-seasons': {
@@ -395,6 +416,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ApiCronRefreshRoute: ApiCronRefreshRoute,
+  ApiPublicComputeStandingsRoute: ApiPublicComputeStandingsRoute,
   ApiPublicDiscoverSeasonsRoute: ApiPublicDiscoverSeasonsRoute,
   ApiPublicFetchNewsRoute: ApiPublicFetchNewsRoute,
   ApiPublicFetchPlayerPhotosRoute: ApiPublicFetchPlayerPhotosRoute,
