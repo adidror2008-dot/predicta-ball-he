@@ -49,10 +49,11 @@ export function MatchHeaderCard({
     );
   }
 
+  const isPostponed = header.status === "postponed";
   const hasScore =
     header.isFinished && header.homeScore !== null && header.awayScore !== null;
-  const date = formatDate(header.kickoffAt);
-  const time = formatTime(header.kickoffAt);
+  const date = isPostponed ? null : formatDate(header.kickoffAt);
+  const time = isPostponed ? null : formatTime(header.kickoffAt);
 
   return (
     <section className="rounded-2xl bg-card p-4 shadow-card">
@@ -69,6 +70,10 @@ export function MatchHeaderCard({
                 הסתיים
               </span>
             </>
+          ) : isPostponed ? (
+            <span className="rounded-full bg-status-draw/25 px-2 py-0.5 text-[11px] font-medium text-status-draw">
+              נדחה
+            </span>
           ) : (
             <span className="text-xl font-bold text-muted-foreground">VS</span>
           )}
@@ -80,6 +85,7 @@ export function MatchHeaderCard({
       <div className="mt-4 border-t border-border pt-3">
         <h2 className="mb-2 text-xs font-bold text-muted-foreground">פרטי המשחק</h2>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          {isPostponed ? <span>מועד חדש טרם נקבע</span> : null}
           {date ? (
             <span className="flex items-center gap-1.5">
               <CalendarDays className="size-3.5" aria-hidden />
