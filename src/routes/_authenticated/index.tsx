@@ -187,6 +187,8 @@ function MatchesScreen() {
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [standingsOpen, setStandingsOpen] = useState(false);
+
   const [isFetching, setIsFetching] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
   const { prefs, hydrated, update } = useChipPrefs();
@@ -256,6 +258,9 @@ function MatchesScreen() {
     0,
     competitions.findIndex((c) => c.id === activeId),
   );
+
+  const activeCompetition = competitions.find((c) => c.id === activeId) ?? null;
+
 
   const showSkeleton = !hydrated || isLoadingCompetitions;
 
