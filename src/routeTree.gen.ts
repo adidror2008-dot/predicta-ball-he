@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as TmpStatsPreviewRouteImport } from './routes/tmp-stats-preview'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedAccuracyRouteImport } from './routes/_authenticated/accuracy'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
@@ -44,11 +43,6 @@ const AuthRoute = AuthRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TmpStatsPreviewRoute = TmpStatsPreviewRouteImport.update({
-  id: '/tmp-stats-preview',
-  path: '/tmp-stats-preview',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
@@ -154,7 +148,6 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/tmp-stats-preview': typeof TmpStatsPreviewRoute
   '/accuracy': typeof AuthenticatedAccuracyRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/news': typeof AuthenticatedNewsRoute
@@ -176,7 +169,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/tmp-stats-preview': typeof TmpStatsPreviewRoute
   '/accuracy': typeof AuthenticatedAccuracyRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/news': typeof AuthenticatedNewsRoute
@@ -201,7 +193,6 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/tmp-stats-preview': typeof TmpStatsPreviewRoute
   '/_authenticated/accuracy': typeof AuthenticatedAccuracyRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/news': typeof AuthenticatedNewsRoute
@@ -227,7 +218,6 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/reset-password'
-    | '/tmp-stats-preview'
     | '/accuracy'
     | '/admin'
     | '/news'
@@ -249,7 +239,6 @@ export interface FileRouteTypes {
   to:
     | '/auth'
     | '/reset-password'
-    | '/tmp-stats-preview'
     | '/accuracy'
     | '/admin'
     | '/news'
@@ -273,7 +262,6 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/reset-password'
-    | '/tmp-stats-preview'
     | '/_authenticated/accuracy'
     | '/_authenticated/admin'
     | '/_authenticated/news'
@@ -298,7 +286,6 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
-  TmpStatsPreviewRoute: typeof TmpStatsPreviewRoute
   ApiCronRefreshRoute: typeof ApiCronRefreshRoute
   ApiPublicComputeStandingsRoute: typeof ApiPublicComputeStandingsRoute
   ApiPublicDiscoverSeasonsRoute: typeof ApiPublicDiscoverSeasonsRoute
@@ -334,13 +321,6 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/tmp-stats-preview': {
-      id: '/tmp-stats-preview'
-      path: '/tmp-stats-preview'
-      fullPath: '/tmp-stats-preview'
-      preLoaderRoute: typeof TmpStatsPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
@@ -497,7 +477,6 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
-  TmpStatsPreviewRoute: TmpStatsPreviewRoute,
   ApiCronRefreshRoute: ApiCronRefreshRoute,
   ApiPublicComputeStandingsRoute: ApiPublicComputeStandingsRoute,
   ApiPublicDiscoverSeasonsRoute: ApiPublicDiscoverSeasonsRoute,
