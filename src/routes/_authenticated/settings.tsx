@@ -7,6 +7,8 @@ import { EmptyState, SectionTitle, SkeletonBlock } from "@/components/predictaba
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { ensurePushSubscription, needsIosHomeScreen } from "@/lib/push-client";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
