@@ -63,7 +63,7 @@ export function MatchCard({ match }: { match: MatchCardData }) {
           {statusLabel[match.status]}
         </span>
         <div className="flex items-center gap-2">
-          {!isFuture && match.date ? (
+          {!isFuture && !isPostponed && match.date ? (
             <LtrNum className="text-[11px] text-muted-foreground">{match.date}</LtrNum>
           ) : null}
         </div>
