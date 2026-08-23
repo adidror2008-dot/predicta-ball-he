@@ -3,7 +3,7 @@ import { PROVIDER_KEY_MAP, parseStatValue } from "@/lib/match-stats-keys";
 
 const SOFASCORE_HOST = "sportapi7.p.rapidapi.com";
 const SOURCE = "sofascore";
-const DEFAULT_LIMIT = 10;
+const DEFAULT_LIMIT = 30;
 
 export type JobRunStatus = "success" | "partial" | "failed" | "skipped";
 
@@ -201,16 +201,9 @@ export async function runFetchMatchStats(data: {
 
     if (rows.length === 0) continue;
 
-    // No unique constraint on match_stats — clean replace keeps the run idempotent.
-    const { error: delError } = await supabaseAdmin
+    const { error: insError } = await supabaseAdmin
       .from("match_stats")
-      .delete()
-      .eq("match_id", match.id);
-    if (delError) {
-      hadFailure = true;
-      continue;
-    }
-    const { error: insError } = await supabaseAdmin.from("match_stats").insert(rows);
+      .upsert(rows, { onConflict: "match_id,team_id,stat_key,period" });
     if (insError) {
       hadFailure = true;
       continue;
