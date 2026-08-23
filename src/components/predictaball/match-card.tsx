@@ -76,8 +76,12 @@ export function MatchCard({ match }: { match: MatchCardData }) {
           <span className="min-w-0 flex-1 truncate whitespace-nowrap text-start text-sm font-medium">{match.homeName}</span>
         </div>
 
-        <div className="w-14 shrink-0 text-center">
-          {hasScore ? (
+        <div className={cn("shrink-0 text-center", isPostponed ? "w-24" : "w-14")}>
+          {isPostponed ? (
+            <span className="block text-[11px] leading-tight text-muted-foreground">
+              מועד חדש טרם נקבע
+            </span>
+          ) : hasScore ? (
             <div className="flex flex-col items-center gap-0.5">
               {match.status === "live" && match.minute != null ? (
                 <LtrNum className="text-[11px] font-semibold text-status-loss">
