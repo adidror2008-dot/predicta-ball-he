@@ -48,14 +48,14 @@ export function MatchStatsTab({ matchRef }: { matchRef: string }) {
               </LtrNum>
             </div>
             <div className="flex h-1.5 w-full gap-1 overflow-hidden">
-              <div className="flex flex-1 justify-start">
+              <div className="flex flex-1 justify-end">
                 <div
                   className="h-full rounded-full bg-primary"
                   style={{ width: `${homePct}%` }}
                   aria-hidden
                 />
               </div>
-              <div className="flex flex-1 justify-end">
+              <div className="flex flex-1 justify-start">
                 <div
                   className="h-full rounded-full bg-surface-2"
                   style={{ width: `${awayPct}%` }}
