@@ -105,6 +105,8 @@ function Field({
 
 function toHebrewError(message: string): string {
   const m = message.toLowerCase();
+  if (m.includes("user limit reached")) return "ההרשמה מלאה כרגע. פנה למנהל.";
+  if (m.includes("signup blocked for this email")) return "המייל הזה חסום מהרשמה.";
   if (m.includes("invalid login credentials")) return "מייל או סיסמה שגויים";
   if (m.includes("email not confirmed")) return "המייל עדיין לא אומת. בדוק את תיבת הדואר";
   if (m.includes("user already registered") || m.includes("already registered"))
@@ -112,6 +114,7 @@ function toHebrewError(message: string): string {
   if (m.includes("password should be")) return "הסיסמה חייבת להכיל לפחות 6 תווים";
   if (m.includes("blocked")) return "כתובת המייל חסומה להרשמה";
   if (m.includes("limit reached")) return "מכסת המשתמשים באפליקציה מלאה";
+
   if (m.includes("database error"))
     return "ההרשמה נחסמה: כתובת המייל חסומה או שמכסת המשתמשים מלאה";
   if (m.includes("rate limit")) return "יותר מדי ניסיונות. נסה שוב בעוד כמה דקות";
