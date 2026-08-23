@@ -44,6 +44,7 @@ const SCROLL_OFFSET = 12;
 const PAST_MATCHES_ABOVE = 2;
 
 function toStatus(status: string | null): MatchStatus {
+  if (status === "postponed") return "postponed";
   if (status === "finished" || status === "ended" || status === "afterET" || status === "ap") {
     return "finished";
   }
