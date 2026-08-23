@@ -7,6 +7,7 @@ import { MatchHeaderCard } from "@/components/predictaball/match-header-card";
 import { MatchPredictionSection } from "@/components/predictaball/match-prediction-section";
 import { MatchPitchLineups } from "@/components/predictaball/match-pitch-lineups";
 import { MatchEventsTab } from "@/components/predictaball/match-events-tab";
+import { MatchStatsTab } from "@/components/predictaball/match-stats-tab";
 import { getMatchHeaderFn } from "@/lib/match-details-read.functions";
 
 export const Route = createFileRoute("/_authenticated/match/$id")({
