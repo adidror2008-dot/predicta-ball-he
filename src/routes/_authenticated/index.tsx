@@ -159,7 +159,7 @@ function MatchesPanel({
     );
   }
 
-  if (finished.length === 0 && upcoming.length === 0) {
+  if (finished.length === 0 && upcoming.length === 0 && postponed.length === 0) {
     return <EmptyState text="אין משחקים להצגה כרגע" />;
   }
 
@@ -184,6 +184,18 @@ function MatchesPanel({
       ) : null}
 
       {upcoming.map((m) => (
+        <MatchCard key={m.id} match={m} />
+      ))}
+
+      {postponed.length > 0 ? (
+        <div className="flex items-center gap-3 py-1">
+          <span className="h-px flex-1 bg-border" aria-hidden />
+          <span className="text-xs font-medium text-muted-foreground">משחקים שנדחו</span>
+          <span className="h-px flex-1 bg-border" aria-hidden />
+        </div>
+      ) : null}
+
+      {postponed.map((m) => (
         <MatchCard key={m.id} match={m} />
       ))}
     </div>
