@@ -460,3 +460,41 @@ export async function getModelAccuracy(): Promise<ModelAccuracy | null> {
   };
 }
 
+
+export type MatchStatRow = {
+  key: string;
+  label_he: string;
+  home: number;
+  away: number;
+  is_percent: boolean;
+};
+
+export async function getMatchStats(matchRef: string): Promise<MatchStatRow[]> {
+  const { STAT_DISPLAY, PERCENT_KEYS } = await import("@/lib/match-stats-keys");
+  const match = await resolveMatch(matchRef);
+  if (!match) return [];
+
+  const { data, error } = await supabaseAdmin
+    .from("match_stats")
+    .select("team_id, stat_key, stat_value")
+    .eq("match_id", match.id)
+    .eq("period", "ALL");
+  if (error) throw new Error(error.message);
+
+  const homeByKey = new Map<string, number>();
+  const awayByKey = new Map<string, number>();
+  for (const r of data ?? []) {
+    if (!r.stat_key || r.stat_value === null) continue;
+    const value = Number(r.stat_value);
+    if (!Number.isFinite(value)) continue;
+    if (r.team_id === match.home_team_id) homeByKey.set(r.stat_key, value);
+    else if (r.team_id === match.away_team_id) awayByKey.set(r.stat_key, value);
+  }
+
+  return STAT_DISPLAY.flatMap(({ key, labelHe }) => {
+    const home = homeByKey.get(key);
+    const away = awayByKey.get(key);
+    if (home === undefined || away === undefined) return [];
+    return [{ key, label_he: labelHe, home, away, is_percent: PERCENT_KEYS.has(key) }];
+  });
+}
