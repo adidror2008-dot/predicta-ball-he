@@ -62,10 +62,18 @@ function MatchPage() {
 
       {header?.isFinished ? (
         <section>
+          <SectionTitle>סטטיסטיקות</SectionTitle>
+          <MatchStatsTab matchRef={id} />
+        </section>
+      ) : null}
+
+      {header?.isFinished ? (
+        <section>
           <SectionTitle>אירועי המשחק</SectionTitle>
           <MatchEventsTab matchRef={id} />
         </section>
       ) : null}
+
     </main>
   );
 }
