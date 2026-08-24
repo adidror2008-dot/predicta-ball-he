@@ -48,6 +48,7 @@ export async function runFetchMatchLineups(data: {
     metric: number,
     error?: string,
   ): Promise<string | undefined> => {
+    if (skipJobRun) return undefined;
     const { error: jobError } = await supabaseAdmin.from("job_runs").insert({
       job_name: "fetch-match-lineups",
       started_at: startedAt,
