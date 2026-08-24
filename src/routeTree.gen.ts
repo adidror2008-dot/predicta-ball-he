@@ -30,6 +30,7 @@ import { Route as ApiPublicFetchTeamLogosRouteImport } from './routes/api/public
 import { Route as ApiPublicSyncCompetitionsRouteImport } from './routes/api/public/sync-competitions'
 import { Route as ApiPublicSyncFixturesDailyRouteImport } from './routes/api/public/sync-fixtures-daily'
 import { Route as ApiPublicTickRouteImport } from './routes/api/public/tick'
+import { Route as ApiPublicTranslateTeamNamesRouteImport } from './routes/api/public/translate-team-names'
 import { Route as ApiPublicVerifyEndpointsRouteImport } from './routes/api/public/verify-endpoints'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -144,6 +145,12 @@ const ApiPublicTickRoute = ApiPublicTickRouteImport.update({
   path: '/api/public/tick',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicTranslateTeamNamesRoute =
+  ApiPublicTranslateTeamNamesRouteImport.update({
+    id: '/api/public/translate-team-names',
+    path: '/api/public/translate-team-names',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicVerifyEndpointsRoute =
   ApiPublicVerifyEndpointsRouteImport.update({
     id: '/api/public/verify-endpoints',
@@ -172,6 +179,7 @@ export interface FileRoutesByFullPath {
   '/api/public/sync-competitions': typeof ApiPublicSyncCompetitionsRoute
   '/api/public/sync-fixtures-daily': typeof ApiPublicSyncFixturesDailyRoute
   '/api/public/tick': typeof ApiPublicTickRoute
+  '/api/public/translate-team-names': typeof ApiPublicTranslateTeamNamesRoute
   '/api/public/verify-endpoints': typeof ApiPublicVerifyEndpointsRoute
 }
 export interface FileRoutesByTo {
@@ -195,6 +203,7 @@ export interface FileRoutesByTo {
   '/api/public/sync-competitions': typeof ApiPublicSyncCompetitionsRoute
   '/api/public/sync-fixtures-daily': typeof ApiPublicSyncFixturesDailyRoute
   '/api/public/tick': typeof ApiPublicTickRoute
+  '/api/public/translate-team-names': typeof ApiPublicTranslateTeamNamesRoute
   '/api/public/verify-endpoints': typeof ApiPublicVerifyEndpointsRoute
 }
 export interface FileRoutesById {
@@ -220,6 +229,7 @@ export interface FileRoutesById {
   '/api/public/sync-competitions': typeof ApiPublicSyncCompetitionsRoute
   '/api/public/sync-fixtures-daily': typeof ApiPublicSyncFixturesDailyRoute
   '/api/public/tick': typeof ApiPublicTickRoute
+  '/api/public/translate-team-names': typeof ApiPublicTranslateTeamNamesRoute
   '/api/public/verify-endpoints': typeof ApiPublicVerifyEndpointsRoute
 }
 export interface FileRouteTypes {
@@ -245,6 +255,7 @@ export interface FileRouteTypes {
     | '/api/public/sync-competitions'
     | '/api/public/sync-fixtures-daily'
     | '/api/public/tick'
+    | '/api/public/translate-team-names'
     | '/api/public/verify-endpoints'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -268,6 +279,7 @@ export interface FileRouteTypes {
     | '/api/public/sync-competitions'
     | '/api/public/sync-fixtures-daily'
     | '/api/public/tick'
+    | '/api/public/translate-team-names'
     | '/api/public/verify-endpoints'
   id:
     | '__root__'
@@ -292,6 +304,7 @@ export interface FileRouteTypes {
     | '/api/public/sync-competitions'
     | '/api/public/sync-fixtures-daily'
     | '/api/public/tick'
+    | '/api/public/translate-team-names'
     | '/api/public/verify-endpoints'
   fileRoutesById: FileRoutesById
 }
@@ -311,6 +324,7 @@ export interface RootRouteChildren {
   ApiPublicSyncCompetitionsRoute: typeof ApiPublicSyncCompetitionsRoute
   ApiPublicSyncFixturesDailyRoute: typeof ApiPublicSyncFixturesDailyRoute
   ApiPublicTickRoute: typeof ApiPublicTickRoute
+  ApiPublicTranslateTeamNamesRoute: typeof ApiPublicTranslateTeamNamesRoute
   ApiPublicVerifyEndpointsRoute: typeof ApiPublicVerifyEndpointsRoute
 }
 
@@ -463,6 +477,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/translate-team-names': {
+      id: '/api/public/translate-team-names'
+      path: '/api/public/translate-team-names'
+      fullPath: '/api/public/translate-team-names'
+      preLoaderRoute: typeof ApiPublicTranslateTeamNamesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/verify-endpoints': {
       id: '/api/public/verify-endpoints'
       path: '/api/public/verify-endpoints'
@@ -510,6 +531,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicSyncCompetitionsRoute: ApiPublicSyncCompetitionsRoute,
   ApiPublicSyncFixturesDailyRoute: ApiPublicSyncFixturesDailyRoute,
   ApiPublicTickRoute: ApiPublicTickRoute,
+  ApiPublicTranslateTeamNamesRoute: ApiPublicTranslateTeamNamesRoute,
   ApiPublicVerifyEndpointsRoute: ApiPublicVerifyEndpointsRoute,
 }
 export const routeTree = rootRouteImport
