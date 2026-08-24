@@ -531,6 +531,7 @@ export type Database = {
           minute: number | null
           needs_review: boolean | null
           previous_leg_external_id: string | null
+          ratings_checked_at: string | null
           round: string | null
           round_name: string | null
           round_number: number | null
@@ -563,6 +564,7 @@ export type Database = {
           minute?: number | null
           needs_review?: boolean | null
           previous_leg_external_id?: string | null
+          ratings_checked_at?: string | null
           round?: string | null
           round_name?: string | null
           round_number?: number | null
@@ -595,6 +597,7 @@ export type Database = {
           minute?: number | null
           needs_review?: boolean | null
           previous_leg_external_id?: string | null
+          ratings_checked_at?: string | null
           round?: string | null
           round_name?: string | null
           round_number?: number | null
