@@ -40,7 +40,7 @@ export async function runTranslateTeamNames(
       result_metric: translated,
       result_detail: { candidates, translated, budget_exhausted: budgetExhausted, message },
     });
-    return { status, candidates, translated, budget_exhausted: budgetExhausted, message };
+    return { status, candidates, translated, budget_exhausted: budgetExhausted, ...(message ? { message } : {}) };
   };
 
   const { data: rows, error } = await supabaseAdmin
