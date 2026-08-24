@@ -32,7 +32,9 @@ export const Route = createFileRoute("/api/public/fetch-match-lineups")({
         );
         const result = input.matchExternalId
           ? await runFetchMatchLineups({ matchExternalId: input.matchExternalId })
-          : await runBackfillMatchLineups({ limit: input.limit });
+          : await runBackfillMatchLineups(
+              input.limit !== undefined ? { limit: input.limit } : {},
+            );
         return new Response(JSON.stringify(result), {
           status: result.status === "failed" ? 500 : 200,
           headers: { "content-type": "application/json", "cache-control": "no-store" },
