@@ -110,6 +110,177 @@ export type Database = {
         }
         Relationships: []
       }
+      backtest_predictions: {
+        Row: {
+          actual_away: number
+          actual_home: number
+          brier: number
+          competition_id: string | null
+          confidence: number
+          confidence_band: string
+          created_at: string
+          elo_away: number | null
+          elo_home: number | null
+          hit_exact: boolean
+          hit_goal_bucket: boolean
+          hit_ou25: boolean
+          hit_winner: boolean
+          id: string
+          kickoff_at: string | null
+          lambda_away: number
+          lambda_home: number
+          match_id: string
+          pred_away: number
+          pred_home: number
+          prob_away: number
+          prob_draw: number
+          prob_home: number
+          prob_over_2_5: number
+          rps: number
+          run_id: string
+        }
+        Insert: {
+          actual_away: number
+          actual_home: number
+          brier: number
+          competition_id?: string | null
+          confidence: number
+          confidence_band: string
+          created_at?: string
+          elo_away?: number | null
+          elo_home?: number | null
+          hit_exact: boolean
+          hit_goal_bucket: boolean
+          hit_ou25: boolean
+          hit_winner: boolean
+          id?: string
+          kickoff_at?: string | null
+          lambda_away: number
+          lambda_home: number
+          match_id: string
+          pred_away: number
+          pred_home: number
+          prob_away: number
+          prob_draw: number
+          prob_home: number
+          prob_over_2_5: number
+          rps: number
+          run_id: string
+        }
+        Update: {
+          actual_away?: number
+          actual_home?: number
+          brier?: number
+          competition_id?: string | null
+          confidence?: number
+          confidence_band?: string
+          created_at?: string
+          elo_away?: number | null
+          elo_home?: number | null
+          hit_exact?: boolean
+          hit_goal_bucket?: boolean
+          hit_ou25?: boolean
+          hit_winner?: boolean
+          id?: string
+          kickoff_at?: string | null
+          lambda_away?: number
+          lambda_home?: number
+          match_id?: string
+          pred_away?: number
+          pred_home?: number
+          prob_away?: number
+          prob_draw?: number
+          prob_home?: number
+          prob_over_2_5?: number
+          rps?: number
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backtest_predictions_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "backtest_predictions_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "backtest_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      backtest_results: {
+        Row: {
+          brier_avg: number | null
+          config_overrides: Json
+          created_at: string
+          date_from: string | null
+          date_to: string | null
+          duration_ms: number | null
+          exact_score_accuracy: number | null
+          goal_bucket_accuracy: number | null
+          id: string
+          label: string | null
+          model_version: string
+          n: number
+          n_candidates: number
+          n_excluded: number
+          naive_baseline_rps: number | null
+          naive_winner_accuracy: number | null
+          over_under_accuracy: number | null
+          params_effective: Json
+          rps_avg: number | null
+          winner_accuracy: number | null
+        }
+        Insert: {
+          brier_avg?: number | null
+          config_overrides?: Json
+          created_at?: string
+          date_from?: string | null
+          date_to?: string | null
+          duration_ms?: number | null
+          exact_score_accuracy?: number | null
+          goal_bucket_accuracy?: number | null
+          id?: string
+          label?: string | null
+          model_version: string
+          n: number
+          n_candidates: number
+          n_excluded: number
+          naive_baseline_rps?: number | null
+          naive_winner_accuracy?: number | null
+          over_under_accuracy?: number | null
+          params_effective?: Json
+          rps_avg?: number | null
+          winner_accuracy?: number | null
+        }
+        Update: {
+          brier_avg?: number | null
+          config_overrides?: Json
+          created_at?: string
+          date_from?: string | null
+          date_to?: string | null
+          duration_ms?: number | null
+          exact_score_accuracy?: number | null
+          goal_bucket_accuracy?: number | null
+          id?: string
+          label?: string | null
+          model_version?: string
+          n?: number
+          n_candidates?: number
+          n_excluded?: number
+          naive_baseline_rps?: number | null
+          naive_winner_accuracy?: number | null
+          over_under_accuracy?: number | null
+          params_effective?: Json
+          rps_avg?: number | null
+          winner_accuracy?: number | null
+        }
+        Relationships: []
+      }
       blocked_emails: {
         Row: {
           blocked_at: string
