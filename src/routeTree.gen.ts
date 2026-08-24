@@ -19,6 +19,7 @@ import { Route as AuthenticatedNewsRouteImport } from './routes/_authenticated/n
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedMatchIdRouteImport } from './routes/_authenticated/match.$id'
 import { Route as ApiCronRefreshRouteImport } from './routes/api/cron/refresh'
+import { Route as ApiPublicBacktestV7RouteImport } from './routes/api/public/backtest-v7'
 import { Route as ApiPublicComputeStandingsRouteImport } from './routes/api/public/compute-standings'
 import { Route as ApiPublicDiscoverSeasonsRouteImport } from './routes/api/public/discover-seasons'
 import { Route as ApiPublicFetchMatchLineupsRouteImport } from './routes/api/public/fetch-match-lineups'
@@ -80,6 +81,11 @@ const AuthenticatedMatchIdRoute = AuthenticatedMatchIdRouteImport.update({
 const ApiCronRefreshRoute = ApiCronRefreshRouteImport.update({
   id: '/api/cron/refresh',
   path: '/api/cron/refresh',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBacktestV7Route = ApiPublicBacktestV7RouteImport.update({
+  id: '/api/public/backtest-v7',
+  path: '/api/public/backtest-v7',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicComputeStandingsRoute =
@@ -168,6 +174,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/match/$id': typeof AuthenticatedMatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
+  '/api/public/backtest-v7': typeof ApiPublicBacktestV7Route
   '/api/public/compute-standings': typeof ApiPublicComputeStandingsRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
   '/api/public/fetch-match-lineups': typeof ApiPublicFetchMatchLineupsRoute
@@ -192,6 +199,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/match/$id': typeof AuthenticatedMatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
+  '/api/public/backtest-v7': typeof ApiPublicBacktestV7Route
   '/api/public/compute-standings': typeof ApiPublicComputeStandingsRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
   '/api/public/fetch-match-lineups': typeof ApiPublicFetchMatchLineupsRoute
@@ -218,6 +226,7 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/match/$id': typeof AuthenticatedMatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
+  '/api/public/backtest-v7': typeof ApiPublicBacktestV7Route
   '/api/public/compute-standings': typeof ApiPublicComputeStandingsRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
   '/api/public/fetch-match-lineups': typeof ApiPublicFetchMatchLineupsRoute
@@ -244,6 +253,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/match/$id'
     | '/api/cron/refresh'
+    | '/api/public/backtest-v7'
     | '/api/public/compute-standings'
     | '/api/public/discover-seasons'
     | '/api/public/fetch-match-lineups'
@@ -268,6 +278,7 @@ export interface FileRouteTypes {
     | '/'
     | '/match/$id'
     | '/api/cron/refresh'
+    | '/api/public/backtest-v7'
     | '/api/public/compute-standings'
     | '/api/public/discover-seasons'
     | '/api/public/fetch-match-lineups'
@@ -293,6 +304,7 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/match/$id'
     | '/api/cron/refresh'
+    | '/api/public/backtest-v7'
     | '/api/public/compute-standings'
     | '/api/public/discover-seasons'
     | '/api/public/fetch-match-lineups'
@@ -313,6 +325,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ApiCronRefreshRoute: typeof ApiCronRefreshRoute
+  ApiPublicBacktestV7Route: typeof ApiPublicBacktestV7Route
   ApiPublicComputeStandingsRoute: typeof ApiPublicComputeStandingsRoute
   ApiPublicDiscoverSeasonsRoute: typeof ApiPublicDiscoverSeasonsRoute
   ApiPublicFetchMatchLineupsRoute: typeof ApiPublicFetchMatchLineupsRoute
@@ -398,6 +411,13 @@ declare module '@tanstack/react-router' {
       path: '/api/cron/refresh'
       fullPath: '/api/cron/refresh'
       preLoaderRoute: typeof ApiCronRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/backtest-v7': {
+      id: '/api/public/backtest-v7'
+      path: '/api/public/backtest-v7'
+      fullPath: '/api/public/backtest-v7'
+      preLoaderRoute: typeof ApiPublicBacktestV7RouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/compute-standings': {
@@ -520,6 +540,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ApiCronRefreshRoute: ApiCronRefreshRoute,
+  ApiPublicBacktestV7Route: ApiPublicBacktestV7Route,
   ApiPublicComputeStandingsRoute: ApiPublicComputeStandingsRoute,
   ApiPublicDiscoverSeasonsRoute: ApiPublicDiscoverSeasonsRoute,
   ApiPublicFetchMatchLineupsRoute: ApiPublicFetchMatchLineupsRoute,
