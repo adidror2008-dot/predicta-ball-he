@@ -14,15 +14,20 @@ export const Route = createFileRoute("/api/public/fetch-player-photos")({
         }
 
         let limit: number | undefined;
+        let backfill = false;
         try {
-          const body = (await request.json()) as { limit?: number } | null;
+          const body = (await request.json()) as { limit?: number; backfill?: boolean } | null;
           if (body && typeof body.limit === "number") limit = body.limit;
+          if (body && body.backfill === true) backfill = true;
         } catch {
           limit = undefined;
         }
 
-        const { runFetchPlayerPhotos } = await import("@/lib/fetch-player-photos.server");
-        const result = await runFetchPlayerPhotos(limit === undefined ? {} : { limit });
+        const mod = await import("@/lib/fetch-player-photos.server");
+        const args = limit === undefined ? {} : { limit };
+        const result = backfill
+          ? await mod.runBackfillPlayerPhotos(args)
+          : await mod.runFetchPlayerPhotos(args);
         return new Response(JSON.stringify(result), {
           status: result.status === "failed" ? 500 : 200,
           headers: { "content-type": "application/json", "cache-control": "no-store" },
