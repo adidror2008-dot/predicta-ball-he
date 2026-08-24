@@ -281,3 +281,106 @@ export async function runFetchMatchLineups(data: {
   }
   return finish("success");
 }
+
+export type BackfillMatchLineupsResult = {
+  status: JobRunStatus;
+  considered: number;
+  processed: number;
+  matches_with_ratings: number;
+  ratings_upserted_total: number;
+  budget_exhausted: boolean;
+  job_run_error?: string;
+};
+
+/**
+ * Batch backfill of player_ratings via the existing lineups fetcher.
+ * No new data source; one outgoing call per match, budget-gated, no retries.
+ */
+export async function runBackfillMatchLineups({
+  limit,
+}: {
+  limit?: number;
+}): Promise<BackfillMatchLineupsResult> {
+  const startedAt = new Date().toISOString();
+  const cap = Math.max(1, Math.min(50, limit ?? 30));
+
+  let considered = 0;
+  let processed = 0;
+  let matchesWithRatings = 0;
+  let ratingsUpsertedTotal = 0;
+  let budgetExhausted = false;
+
+  const { data: rated } = await supabaseAdmin.from("player_ratings").select("match_id");
+  const ratedSet = new Set((rated ?? []).map((r) => r.match_id));
+
+  const { data: finished, error: finishedError } = await supabaseAdmin
+    .from("matches")
+    .select("id, external_id")
+    .eq("source", SOURCE)
+    .eq("status", "finished")
+    .not("external_id", "is", null)
+    .is("ratings_checked_at", null)
+    .order("kickoff_at", { ascending: false })
+    .limit(cap + ratedSet.size);
+
+  const candidates = (finished ?? [])
+    .filter((m) => !ratedSet.has(m.id))
+    .slice(0, cap);
+  considered = candidates.length;
+
+  for (const candidate of candidates) {
+    const result = await runFetchMatchLineups({
+      matchExternalId: String(candidate.external_id),
+      skipJobRun: true,
+    });
+    if (result.budget_exhausted) {
+      budgetExhausted = true;
+      break;
+    }
+    processed += 1;
+    if (result.ratings_upserted > 0) {
+      matchesWithRatings += 1;
+      ratingsUpsertedTotal += result.ratings_upserted;
+    }
+    await supabaseAdmin
+      .from("matches")
+      .update({ ratings_checked_at: new Date().toISOString() })
+      .eq("id", candidate.id);
+  }
+
+  const status: JobRunStatus = finishedError
+    ? "failed"
+    : considered === 0
+      ? "skipped"
+      : budgetExhausted
+        ? "partial"
+        : "success";
+
+  let jobRunError: string | undefined;
+  const { error: jobError } = await supabaseAdmin.from("job_runs").insert({
+    job_name: "backfill-match-lineups",
+    started_at: startedAt,
+    finished_at: new Date().toISOString(),
+    status,
+    result_metric: matchesWithRatings,
+    result_detail: {
+      considered,
+      processed,
+      matches_with_ratings: matchesWithRatings,
+      ratings_upserted_total: ratingsUpsertedTotal,
+      budget_exhausted: budgetExhausted,
+    } as never,
+    error: finishedError ? finishedError.message : null,
+  });
+  if (jobError) jobRunError = jobError.message;
+
+  return {
+    status,
+    considered,
+    processed,
+    matches_with_ratings: matchesWithRatings,
+    ratings_upserted_total: ratingsUpsertedTotal,
+    budget_exhausted: budgetExhausted,
+    ...(jobRunError ? { job_run_error: jobRunError } : {}),
+  };
+}
