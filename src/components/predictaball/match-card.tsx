@@ -89,7 +89,7 @@ export function MatchCard({ match }: { match: MatchCardData }) {
                 </LtrNum>
               ) : null}
               <LtrNum className="text-lg font-bold">
-                {match.homeScore} - {match.awayScore}
+                {match.awayScore} - {match.homeScore}
               </LtrNum>
             </div>
           ) : isFuture && match.date ? (
