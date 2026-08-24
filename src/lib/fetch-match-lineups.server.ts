@@ -27,7 +27,9 @@ type AnyRec = Record<string, any>;
  */
 export async function runFetchMatchLineups(data: {
   matchExternalId: string;
+  skipJobRun?: boolean;
 }): Promise<FetchMatchLineupsResult> {
+  const skipJobRun = data.skipJobRun === true;
   const startedAt = new Date().toISOString();
   const matchExternalId = String(data.matchExternalId);
   const apiKey = process.env["SPORTAPI_API_KEY"];
