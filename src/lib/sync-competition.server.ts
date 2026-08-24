@@ -295,6 +295,16 @@ export async function runSyncCompetition(data: {
     directions: stats,
   });
 
+  // Newly created teams get a Hebrew name in the same run; never breaks the sync.
+  try {
+    const { runTranslateTeamNames } = await import("@/lib/translate-team-names.server");
+    await runTranslateTeamNames({ limit: 50 });
+  } catch (e) {
+    console.error("translate hook failed", e);
+  }
+
+
+
   return {
     status,
     tournament_id: tournamentId,
