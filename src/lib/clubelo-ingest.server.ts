@@ -7,7 +7,8 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
-const BASE = "http://api.clubelo.com";
+const BASE = "https://api.clubelo.com";
+const BASE_HTTP = "http://api.clubelo.com";
 const FETCH_TIMEOUT_MS = 20_000;
 const CHUNK = 500;
 
@@ -113,7 +114,7 @@ export async function runClubEloSnapshot(): Promise<SnapshotResult> {
 
   let rows: string[][];
   try {
-    rows = await fetchCsv(`${BASE}/${snapshotDate}`);
+    rows = await fetchCsv(`/${snapshotDate}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await logJob(supabase, "clubelo_snapshot", startedAt, "error", 0, { error: message });
@@ -375,7 +376,7 @@ export async function runClubEloHistory(input: { limit?: number } = {}): Promise
   for (const club of target) {
     let rows: string[][];
     try {
-      rows = await fetchCsv(`${BASE}/${encodeURIComponent(club)}`);
+      rows = await fetchCsv(`/${encodeURIComponent(club)}`);
     } catch (error) {
       failures.push(`${club}: ${error instanceof Error ? error.message : String(error)}`);
       continue;
