@@ -21,6 +21,7 @@ import { Route as AuthenticatedMatchIdRouteImport } from './routes/_authenticate
 import { Route as ApiCronRefreshRouteImport } from './routes/api/cron/refresh'
 import { Route as ApiPublicBacktestSweepRouteImport } from './routes/api/public/backtest-sweep'
 import { Route as ApiPublicBacktestV7RouteImport } from './routes/api/public/backtest-v7'
+import { Route as ApiPublicClubeloIngestRouteImport } from './routes/api/public/clubelo-ingest'
 import { Route as ApiPublicComputeStandingsRouteImport } from './routes/api/public/compute-standings'
 import { Route as ApiPublicDiscoverSeasonsRouteImport } from './routes/api/public/discover-seasons'
 import { Route as ApiPublicFetchMatchLineupsRouteImport } from './routes/api/public/fetch-match-lineups'
@@ -92,6 +93,11 @@ const ApiPublicBacktestSweepRoute = ApiPublicBacktestSweepRouteImport.update({
 const ApiPublicBacktestV7Route = ApiPublicBacktestV7RouteImport.update({
   id: '/api/public/backtest-v7',
   path: '/api/public/backtest-v7',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicClubeloIngestRoute = ApiPublicClubeloIngestRouteImport.update({
+  id: '/api/public/clubelo-ingest',
+  path: '/api/public/clubelo-ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicComputeStandingsRoute =
@@ -182,6 +188,7 @@ export interface FileRoutesByFullPath {
   '/api/cron/refresh': typeof ApiCronRefreshRoute
   '/api/public/backtest-sweep': typeof ApiPublicBacktestSweepRoute
   '/api/public/backtest-v7': typeof ApiPublicBacktestV7Route
+  '/api/public/clubelo-ingest': typeof ApiPublicClubeloIngestRoute
   '/api/public/compute-standings': typeof ApiPublicComputeStandingsRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
   '/api/public/fetch-match-lineups': typeof ApiPublicFetchMatchLineupsRoute
@@ -208,6 +215,7 @@ export interface FileRoutesByTo {
   '/api/cron/refresh': typeof ApiCronRefreshRoute
   '/api/public/backtest-sweep': typeof ApiPublicBacktestSweepRoute
   '/api/public/backtest-v7': typeof ApiPublicBacktestV7Route
+  '/api/public/clubelo-ingest': typeof ApiPublicClubeloIngestRoute
   '/api/public/compute-standings': typeof ApiPublicComputeStandingsRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
   '/api/public/fetch-match-lineups': typeof ApiPublicFetchMatchLineupsRoute
@@ -236,6 +244,7 @@ export interface FileRoutesById {
   '/api/cron/refresh': typeof ApiCronRefreshRoute
   '/api/public/backtest-sweep': typeof ApiPublicBacktestSweepRoute
   '/api/public/backtest-v7': typeof ApiPublicBacktestV7Route
+  '/api/public/clubelo-ingest': typeof ApiPublicClubeloIngestRoute
   '/api/public/compute-standings': typeof ApiPublicComputeStandingsRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
   '/api/public/fetch-match-lineups': typeof ApiPublicFetchMatchLineupsRoute
@@ -264,6 +273,7 @@ export interface FileRouteTypes {
     | '/api/cron/refresh'
     | '/api/public/backtest-sweep'
     | '/api/public/backtest-v7'
+    | '/api/public/clubelo-ingest'
     | '/api/public/compute-standings'
     | '/api/public/discover-seasons'
     | '/api/public/fetch-match-lineups'
@@ -290,6 +300,7 @@ export interface FileRouteTypes {
     | '/api/cron/refresh'
     | '/api/public/backtest-sweep'
     | '/api/public/backtest-v7'
+    | '/api/public/clubelo-ingest'
     | '/api/public/compute-standings'
     | '/api/public/discover-seasons'
     | '/api/public/fetch-match-lineups'
@@ -317,6 +328,7 @@ export interface FileRouteTypes {
     | '/api/cron/refresh'
     | '/api/public/backtest-sweep'
     | '/api/public/backtest-v7'
+    | '/api/public/clubelo-ingest'
     | '/api/public/compute-standings'
     | '/api/public/discover-seasons'
     | '/api/public/fetch-match-lineups'
@@ -339,6 +351,7 @@ export interface RootRouteChildren {
   ApiCronRefreshRoute: typeof ApiCronRefreshRoute
   ApiPublicBacktestSweepRoute: typeof ApiPublicBacktestSweepRoute
   ApiPublicBacktestV7Route: typeof ApiPublicBacktestV7Route
+  ApiPublicClubeloIngestRoute: typeof ApiPublicClubeloIngestRoute
   ApiPublicComputeStandingsRoute: typeof ApiPublicComputeStandingsRoute
   ApiPublicDiscoverSeasonsRoute: typeof ApiPublicDiscoverSeasonsRoute
   ApiPublicFetchMatchLineupsRoute: typeof ApiPublicFetchMatchLineupsRoute
@@ -438,6 +451,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/backtest-v7'
       fullPath: '/api/public/backtest-v7'
       preLoaderRoute: typeof ApiPublicBacktestV7RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/clubelo-ingest': {
+      id: '/api/public/clubelo-ingest'
+      path: '/api/public/clubelo-ingest'
+      fullPath: '/api/public/clubelo-ingest'
+      preLoaderRoute: typeof ApiPublicClubeloIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/compute-standings': {
@@ -562,6 +582,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCronRefreshRoute: ApiCronRefreshRoute,
   ApiPublicBacktestSweepRoute: ApiPublicBacktestSweepRoute,
   ApiPublicBacktestV7Route: ApiPublicBacktestV7Route,
+  ApiPublicClubeloIngestRoute: ApiPublicClubeloIngestRoute,
   ApiPublicComputeStandingsRoute: ApiPublicComputeStandingsRoute,
   ApiPublicDiscoverSeasonsRoute: ApiPublicDiscoverSeasonsRoute,
   ApiPublicFetchMatchLineupsRoute: ApiPublicFetchMatchLineupsRoute,
