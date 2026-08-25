@@ -32,21 +32,49 @@ function buildClient() {
   });
 }
 
-async function fetchCsv(url: string): Promise<string[][]> {
+async function fetchText(url: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<string> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: controller.signal });
+    const res = await fetch(url, { signal: controller.signal, headers: { accept: "text/csv,*/*" } });
     if (!res.ok) throw new Error(`ClubElo HTTP ${res.status} for ${url}`);
-    const text = await res.text();
-    return text
-      .trim()
-      .split("\n")
-      .map((line) => line.trim().split(","));
+    return await res.text();
   } finally {
     clearTimeout(timer);
   }
 }
+
+async function fetchCsv(path: string): Promise<string[][]> {
+  let lastError: unknown;
+  for (const base of [BASE, BASE_HTTP]) {
+    try {
+      const text = await fetchText(`${base}${path}`);
+      return text
+        .trim()
+        .split("\n")
+        .map((line) => line.trim().split(","));
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+/** Connectivity probe — reports the exact outcome per protocol, no writes. */
+export async function runClubEloProbe(): Promise<Record<string, string>> {
+  const day = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const out: Record<string, string> = {};
+  for (const url of [`${BASE}/${day}`, `${BASE_HTTP}/${day}`, "https://example.com"]) {
+    try {
+      const text = await fetchText(url, 15_000);
+      out[url] = `ok ${text.length} bytes`;
+    } catch (error) {
+      out[url] = error instanceof Error ? error.message : String(error);
+    }
+  }
+  return out;
+}
+
 
 async function logJob(
   supabase: Supa,
