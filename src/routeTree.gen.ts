@@ -19,6 +19,7 @@ import { Route as AuthenticatedNewsRouteImport } from './routes/_authenticated/n
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedMatchIdRouteImport } from './routes/_authenticated/match.$id'
 import { Route as ApiCronRefreshRouteImport } from './routes/api/cron/refresh'
+import { Route as ApiPublicBacktestSweepRouteImport } from './routes/api/public/backtest-sweep'
 import { Route as ApiPublicBacktestV7RouteImport } from './routes/api/public/backtest-v7'
 import { Route as ApiPublicComputeStandingsRouteImport } from './routes/api/public/compute-standings'
 import { Route as ApiPublicDiscoverSeasonsRouteImport } from './routes/api/public/discover-seasons'
@@ -81,6 +82,11 @@ const AuthenticatedMatchIdRoute = AuthenticatedMatchIdRouteImport.update({
 const ApiCronRefreshRoute = ApiCronRefreshRouteImport.update({
   id: '/api/cron/refresh',
   path: '/api/cron/refresh',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBacktestSweepRoute = ApiPublicBacktestSweepRouteImport.update({
+  id: '/api/public/backtest-sweep',
+  path: '/api/public/backtest-sweep',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicBacktestV7Route = ApiPublicBacktestV7RouteImport.update({
@@ -174,6 +180,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/match/$id': typeof AuthenticatedMatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
+  '/api/public/backtest-sweep': typeof ApiPublicBacktestSweepRoute
   '/api/public/backtest-v7': typeof ApiPublicBacktestV7Route
   '/api/public/compute-standings': typeof ApiPublicComputeStandingsRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
@@ -199,6 +206,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/match/$id': typeof AuthenticatedMatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
+  '/api/public/backtest-sweep': typeof ApiPublicBacktestSweepRoute
   '/api/public/backtest-v7': typeof ApiPublicBacktestV7Route
   '/api/public/compute-standings': typeof ApiPublicComputeStandingsRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
@@ -226,6 +234,7 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/match/$id': typeof AuthenticatedMatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
+  '/api/public/backtest-sweep': typeof ApiPublicBacktestSweepRoute
   '/api/public/backtest-v7': typeof ApiPublicBacktestV7Route
   '/api/public/compute-standings': typeof ApiPublicComputeStandingsRoute
   '/api/public/discover-seasons': typeof ApiPublicDiscoverSeasonsRoute
@@ -253,6 +262,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/match/$id'
     | '/api/cron/refresh'
+    | '/api/public/backtest-sweep'
     | '/api/public/backtest-v7'
     | '/api/public/compute-standings'
     | '/api/public/discover-seasons'
@@ -278,6 +288,7 @@ export interface FileRouteTypes {
     | '/'
     | '/match/$id'
     | '/api/cron/refresh'
+    | '/api/public/backtest-sweep'
     | '/api/public/backtest-v7'
     | '/api/public/compute-standings'
     | '/api/public/discover-seasons'
@@ -304,6 +315,7 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/match/$id'
     | '/api/cron/refresh'
+    | '/api/public/backtest-sweep'
     | '/api/public/backtest-v7'
     | '/api/public/compute-standings'
     | '/api/public/discover-seasons'
@@ -325,6 +337,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ApiCronRefreshRoute: typeof ApiCronRefreshRoute
+  ApiPublicBacktestSweepRoute: typeof ApiPublicBacktestSweepRoute
   ApiPublicBacktestV7Route: typeof ApiPublicBacktestV7Route
   ApiPublicComputeStandingsRoute: typeof ApiPublicComputeStandingsRoute
   ApiPublicDiscoverSeasonsRoute: typeof ApiPublicDiscoverSeasonsRoute
@@ -411,6 +424,13 @@ declare module '@tanstack/react-router' {
       path: '/api/cron/refresh'
       fullPath: '/api/cron/refresh'
       preLoaderRoute: typeof ApiCronRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/backtest-sweep': {
+      id: '/api/public/backtest-sweep'
+      path: '/api/public/backtest-sweep'
+      fullPath: '/api/public/backtest-sweep'
+      preLoaderRoute: typeof ApiPublicBacktestSweepRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/backtest-v7': {
@@ -540,6 +560,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ApiCronRefreshRoute: ApiCronRefreshRoute,
+  ApiPublicBacktestSweepRoute: ApiPublicBacktestSweepRoute,
   ApiPublicBacktestV7Route: ApiPublicBacktestV7Route,
   ApiPublicComputeStandingsRoute: ApiPublicComputeStandingsRoute,
   ApiPublicDiscoverSeasonsRoute: ApiPublicDiscoverSeasonsRoute,
