@@ -62,15 +62,15 @@ export function buildNarrativePrompt(items: unknown[]): string {
     "אסור להמציא נתון שלא נמצא ברשומה — אין נתון, פשוט לא מזכירים אותו.",
     "אל תשתמש בשמות קבוצות אם הם לא מופיעים ברשומה.",
     "טון: ענייני ובטוח, בלי הבטחות, בלי סימני קריאה, בלי קלישאות של 'קרב צמוד ומרתק'.",
-    "החזר JSON בלבד, מערך בפורמט:",
-    '[{"id":"...","text":"..."}]',
+    "החזר JSON בלבד, מערך בפורמט (n הוא בדיוק אותו מספר שקיבלת בפריט):",
+    '[{"n":<number>,"text":"..."}]',
     "בלי טקסט חופשי, בלי code fences.",
     JSON.stringify(items),
   ].join("\n");
 }
 
-function toItem(row: Row, names: { home: string | null; away: string | null }) {
-  const item: Record<string, unknown> = { id: row.id };
+function toItem(row: Row, n: number, names: { home: string | null; away: string | null }) {
+  const item: Record<string, unknown> = { n };
   if (names.home) item["home_team"] = names.home;
   if (names.away) item["away_team"] = names.away;
   if (row.predicted_home_score !== null && row.predicted_away_score !== null) {
@@ -99,6 +99,8 @@ function toItem(row: Row, names: { home: string | null; away: string | null }) {
 export async function runPredictionNarratives(
   data: PredictionNarrativeInput = {},
 ): Promise<PredictionNarrativeResult> {
+  const MAX_CONSECUTIVE_FAILURES = 3;
+  let consecutiveFailures = 0;
   let skippedBatches = 0;
   const startedAt = new Date().toISOString();
   const cap = Math.min(800, Math.max(1, data.limit ?? 100));
@@ -212,8 +214,8 @@ export async function runPredictionNarratives(
       return await finish(updated > 0 ? "partial" : "skipped", "budget exhausted for lovable-ai");
     }
 
-    const items = batch.map((row) =>
-      toItem(row, matchTeams.get(row.match_id) ?? { home: null, away: null }),
+    const items = batch.map((row, n) =>
+      toItem(row, n, matchTeams.get(row.match_id) ?? { home: null, away: null }),
     );
 
     let content = "";
@@ -230,6 +232,13 @@ export async function runPredictionNarratives(
         await res.text();
         aiCalls += 1;
         skippedBatches += 1;
+        consecutiveFailures += 1;
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+          return await finish(
+            updated > 0 ? "partial" : "failed",
+            `stopped after ${consecutiveFailures} consecutive batch failures`,
+          );
+        }
         continue;
       }
       aiCalls += 1;
@@ -239,10 +248,17 @@ export async function runPredictionNarratives(
       content = String(json.choices?.[0]?.message?.content ?? "");
     } catch {
       skippedBatches += 1;
+      consecutiveFailures += 1;
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        return await finish(
+          updated > 0 ? "partial" : "failed",
+          `stopped after ${consecutiveFailures} consecutive batch failures`,
+        );
+      }
       continue;
     }
 
-    let pairs: Array<{ id: string; text: string }> = [];
+    let pairs: Array<{ n: number; text: string }> = [];
     try {
       const cleaned = content.replace(/```json/gi, "").replace(/```/g, "").trim();
       const start = cleaned.indexOf("[");
@@ -253,30 +269,46 @@ export async function runPredictionNarratives(
         pairs = parsed
           .map((p) => {
             const o = (p ?? {}) as Record<string, unknown>;
-            return { id: String(o["id"] ?? ""), text: String(o["text"] ?? "").trim() };
+            return { n: Number(o["n"]), text: String(o["text"] ?? "").trim() };
           })
-          .filter((p) => p.id !== "" && p.text !== "");
+          .filter((p) => Number.isInteger(p.n) && p.text !== "");
       }
     } catch {
       parseFailures += 1;
       skippedBatches += 1;
+      consecutiveFailures += 1;
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        return await finish(
+          updated > 0 ? "partial" : "failed",
+          `stopped after ${consecutiveFailures} consecutive batch failures`,
+        );
+      }
       continue;
     }
 
-    const known = new Set(batch.map((b) => b.id));
-    const seen = new Set<string>();
+    const seen = new Set<number>();
     // Per-item validation: a bad item is dropped, the rest of the batch still lands.
-    const validPairs = pairs.filter((pair) => {
-      if (!known.has(pair.id) || seen.has(pair.id)) return false;
-      const ok =
-        pair.text.length >= 10 && pair.text.length <= 700 && /[\u0590-\u05FF]/u.test(pair.text);
-      if (ok) seen.add(pair.id);
-      return ok;
-    });
+    // The AI never sees a UUID — it echoes back the short numeric index instead.
+    const validPairs = pairs
+      .filter((pair) => {
+        if (pair.n < 0 || pair.n >= batch.length || seen.has(pair.n)) return false;
+        const ok =
+          pair.text.length >= 10 && pair.text.length <= 700 && /[\u0590-\u05FF]/u.test(pair.text);
+        if (ok) seen.add(pair.n);
+        return ok;
+      })
+      .map((pair) => ({ id: batch[pair.n]!.id, text: pair.text }));
 
     if (validPairs.length === 0) {
       parseFailures += 1;
       skippedBatches += 1;
+      consecutiveFailures += 1;
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        return await finish(
+          updated > 0 ? "partial" : "failed",
+          `stopped after ${consecutiveFailures} consecutive batch failures`,
+        );
+      }
       continue;
     }
     if (validPairs.length < batch.length) parseFailures += 1;
@@ -291,6 +323,7 @@ export async function runPredictionNarratives(
         .eq("id", pair.id);
       if (!updateError && (count ?? 0) > 0) updated += 1;
     }
+    consecutiveFailures = 0;
 
   }
 
