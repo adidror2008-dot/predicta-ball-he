@@ -99,8 +99,6 @@ function toItem(row: Row, names: { home: string | null; away: string | null }) {
 export async function runPredictionNarratives(
   data: PredictionNarrativeInput = {},
 ): Promise<PredictionNarrativeResult> {
-  const MAX_CONSECUTIVE_FAILURES = 3;
-  let consecutiveFailures = 0;
   let skippedBatches = 0;
   const startedAt = new Date().toISOString();
   const cap = Math.min(800, Math.max(1, data.limit ?? 100));
@@ -229,16 +227,9 @@ export async function runPredictionNarratives(
         }),
       });
       if (!res.ok) {
-        const body = await res.text();
+        await res.text();
         aiCalls += 1;
-        consecutiveFailures += 1;
         skippedBatches += 1;
-        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-          return await finish(
-            updated > 0 ? "partial" : "failed",
-            `stopped after ${consecutiveFailures} consecutive batch failures; ai gateway ${res.status}: ${body.slice(0, 200)}`,
-          );
-        }
         continue;
       }
       aiCalls += 1;
@@ -246,15 +237,8 @@ export async function runPredictionNarratives(
         choices?: Array<{ message?: { content?: string } }>;
       };
       content = String(json.choices?.[0]?.message?.content ?? "");
-    } catch (e) {
-      consecutiveFailures += 1;
+    } catch {
       skippedBatches += 1;
-      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-        return await finish(
-          updated > 0 ? "partial" : "failed",
-          `stopped after ${consecutiveFailures} consecutive batch failures; ai gateway error: ${(e as Error).message}`,
-        );
-      }
       continue;
     }
 
@@ -275,54 +259,39 @@ export async function runPredictionNarratives(
       }
     } catch {
       parseFailures += 1;
-      consecutiveFailures += 1;
       skippedBatches += 1;
-      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-        return await finish(
-          updated > 0 ? "partial" : "failed",
-          `stopped after ${consecutiveFailures} consecutive batch failures; ai returned invalid JSON`,
-        );
-      }
       continue;
     }
 
     const known = new Set(batch.map((b) => b.id));
-    const returned = new Set(pairs.map((pair) => pair.id));
-    const validBatch =
-      pairs.length === batch.length &&
-      returned.size === batch.length &&
-      pairs.every(
-        (pair) =>
-          known.has(pair.id) &&
-          pair.text.length >= 10 &&
-          pair.text.length <= 700 &&
-          /[\u0590-\u05FF]/u.test(pair.text),
-      );
-    if (!validBatch) {
+    const seen = new Set<string>();
+    // Per-item validation: a bad item is dropped, the rest of the batch still lands.
+    const validPairs = pairs.filter((pair) => {
+      if (!known.has(pair.id) || seen.has(pair.id)) return false;
+      const ok =
+        pair.text.length >= 10 && pair.text.length <= 700 && /[\u0590-\u05FF]/u.test(pair.text);
+      if (ok) seen.add(pair.id);
+      return ok;
+    });
+
+    if (validPairs.length === 0) {
       parseFailures += 1;
-      consecutiveFailures += 1;
       skippedBatches += 1;
-      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-        return await finish(
-          updated > 0 ? "partial" : "failed",
-          `stopped after ${consecutiveFailures} consecutive batch failures; ai returned an incomplete or invalid batch`,
-        );
-      }
       continue;
     }
+    if (validPairs.length < batch.length) parseFailures += 1;
 
     // Safety invariant: no existing explanation is cleared up front. Each row is
-    // replaced only after the complete AI batch has passed validation.
+    // written only after its own new text has been validated as non-empty Hebrew.
     const stamp = new Date().toISOString();
-    for (const pair of pairs) {
-      if (!known.has(pair.id)) continue;
+    for (const pair of validPairs) {
       const { error: updateError, count } = await supabaseAdmin
         .from("predictions")
         .update({ explanation_he: pair.text, explanation_at: stamp }, { count: "exact" })
         .eq("id", pair.id);
       if (!updateError && (count ?? 0) > 0) updated += 1;
     }
-    consecutiveFailures = 0;
+
   }
 
   return await finish(updated === candidates ? "success" : "partial");
