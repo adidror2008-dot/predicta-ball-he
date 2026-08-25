@@ -148,13 +148,13 @@ export function MatchPredictionSection({
           <div className="flex-1 text-center">
             <p className="text-xs text-muted-foreground">תוצאה חזויה</p>
             <LtrNum className="text-3xl font-bold">
-              {data.predictedAwayScore ?? "—"} : {data.predictedHomeScore ?? "—"}
+              {data.predictedHomeScore ?? "—"} : {data.predictedAwayScore ?? "—"}
             </LtrNum>
             {showActual ? (
               <p className="mt-1 text-xs text-muted-foreground">
                 תוצאה בפועל{" "}
                 <LtrNum className="font-bold text-foreground">
-                  {header?.awayScore} : {header?.homeScore}
+                  {header?.homeScore} : {header?.awayScore}
                 </LtrNum>
               </p>
             ) : null}
