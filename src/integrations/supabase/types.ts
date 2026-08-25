@@ -299,6 +299,72 @@ export type Database = {
         }
         Relationships: []
       }
+      clubelo_current: {
+        Row: {
+          club: string
+          country: string | null
+          elo: number | null
+          fetched_at: string
+          id: string
+          level: number | null
+          rank: number | null
+          snapshot_date: string
+        }
+        Insert: {
+          club: string
+          country?: string | null
+          elo?: number | null
+          fetched_at?: string
+          id?: string
+          level?: number | null
+          rank?: number | null
+          snapshot_date: string
+        }
+        Update: {
+          club?: string
+          country?: string | null
+          elo?: number | null
+          fetched_at?: string
+          id?: string
+          level?: number | null
+          rank?: number | null
+          snapshot_date?: string
+        }
+        Relationships: []
+      }
+      clubelo_history: {
+        Row: {
+          club: string
+          country: string | null
+          elo: number
+          fetched_at: string
+          id: string
+          level: number | null
+          valid_from: string
+          valid_to: string
+        }
+        Insert: {
+          club: string
+          country?: string | null
+          elo: number
+          fetched_at?: string
+          id?: string
+          level?: number | null
+          valid_from: string
+          valid_to: string
+        }
+        Update: {
+          club?: string
+          country?: string | null
+          elo?: number
+          fetched_at?: string
+          id?: string
+          level?: number | null
+          valid_from?: string
+          valid_to?: string
+        }
+        Relationships: []
+      }
       competition_follows: {
         Row: {
           competition_id: string
