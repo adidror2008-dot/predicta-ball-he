@@ -99,8 +99,6 @@ function toItem(row: Row, names: { home: string | null; away: string | null }) {
 export async function runPredictionNarratives(
   data: PredictionNarrativeInput = {},
 ): Promise<PredictionNarrativeResult> {
-  const MAX_CONSECUTIVE_FAILURES = 3;
-  let consecutiveFailures = 0;
   let skippedBatches = 0;
   const startedAt = new Date().toISOString();
   const cap = Math.min(800, Math.max(1, data.limit ?? 100));
@@ -229,16 +227,9 @@ export async function runPredictionNarratives(
         }),
       });
       if (!res.ok) {
-        const body = await res.text();
+        await res.text();
         aiCalls += 1;
-        consecutiveFailures += 1;
         skippedBatches += 1;
-        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-          return await finish(
-            updated > 0 ? "partial" : "failed",
-            `stopped after ${consecutiveFailures} consecutive batch failures; ai gateway ${res.status}: ${body.slice(0, 200)}`,
-          );
-        }
         continue;
       }
       aiCalls += 1;
@@ -246,15 +237,8 @@ export async function runPredictionNarratives(
         choices?: Array<{ message?: { content?: string } }>;
       };
       content = String(json.choices?.[0]?.message?.content ?? "");
-    } catch (e) {
-      consecutiveFailures += 1;
+    } catch {
       skippedBatches += 1;
-      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-        return await finish(
-          updated > 0 ? "partial" : "failed",
-          `stopped after ${consecutiveFailures} consecutive batch failures; ai gateway error: ${(e as Error).message}`,
-        );
-      }
       continue;
     }
 
@@ -275,14 +259,7 @@ export async function runPredictionNarratives(
       }
     } catch {
       parseFailures += 1;
-      consecutiveFailures += 1;
       skippedBatches += 1;
-      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-        return await finish(
-          updated > 0 ? "partial" : "failed",
-          `stopped after ${consecutiveFailures} consecutive batch failures; ai returned invalid JSON`,
-        );
-      }
       continue;
     }
 
