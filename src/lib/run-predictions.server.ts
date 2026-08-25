@@ -278,6 +278,17 @@ export async function runPredictions(): Promise<RunPredictionsSummary> {
     }
   }
 
+  // Phrase the Hebrew explanation for freshly written predictions (AI quota-gated,
+  // best effort — a phrasing failure never fails the prediction run).
+  if (written > 0) {
+    try {
+      const { runPredictionNarratives } = await import("@/lib/prediction-narrative.server");
+      await runPredictionNarratives({ limit: 100 });
+    } catch {
+      // reported in job_runs by the narrative job itself
+    }
+  }
+
   return {
     candidates: candidateMatches.length,
     written,
@@ -287,3 +298,4 @@ export async function runPredictions(): Promise<RunPredictionsSummary> {
     model_version: modelVersion,
   };
 }
+
