@@ -73,7 +73,21 @@ function buildReasons(data: MatchPrediction, header: MatchHeader | null | undefi
   return lines;
 }
 
+/** Wraps every number/percentage/score run in an LTR span so RTL text stays correct. */
+function ltrNumbers(text: string) {
+  return text.split(/(\d+(?:[.,:\-–]\d+)*%?)/g).map((part, i) =>
+    /^\d/.test(part) ? (
+      <LtrNum key={i} className="font-medium text-foreground">
+        {part}
+      </LtrNum>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
+  );
+}
+
 function Meter({ label, value }: { label: string; value: number | null }) {
+
   const v = value ?? 0;
   return (
     <div>
@@ -172,7 +186,14 @@ export function MatchPredictionSection({
         </div>
       </section>
 
-      {reasons.length > 0 ? (
+      {data.explanationHe ? (
+        <section className="rounded-2xl bg-card p-4 shadow-card">
+          <SectionTitle>פירוט החיזוי</SectionTitle>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {ltrNumbers(data.explanationHe)}
+          </p>
+        </section>
+      ) : reasons.length > 0 ? (
         <section className="rounded-2xl bg-card p-4 shadow-card">
           <SectionTitle>על מה התחזית מבוססת</SectionTitle>
           <ul className="flex flex-col gap-2">
@@ -185,6 +206,7 @@ export function MatchPredictionSection({
           </ul>
         </section>
       ) : null}
+
 
       {computed || nextUpdate ? (
         <section className="rounded-2xl bg-card p-4 text-xs text-muted-foreground shadow-card">

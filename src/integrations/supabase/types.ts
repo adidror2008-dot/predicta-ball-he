@@ -1182,6 +1182,8 @@ export type Database = {
           confidence_band: string
           estimated_share: number
           expected_total_goals: number
+          explanation_at: string | null
+          explanation_he: string | null
           factors: Json
           history_matches_away: number
           history_matches_home: number
@@ -1216,6 +1218,8 @@ export type Database = {
           confidence_band: string
           estimated_share?: number
           expected_total_goals: number
+          explanation_at?: string | null
+          explanation_he?: string | null
           factors?: Json
           history_matches_away: number
           history_matches_home: number
@@ -1250,6 +1254,8 @@ export type Database = {
           confidence_band?: string
           estimated_share?: number
           expected_total_goals?: number
+          explanation_at?: string | null
+          explanation_he?: string | null
           factors?: Json
           history_matches_away?: number
           history_matches_home?: number

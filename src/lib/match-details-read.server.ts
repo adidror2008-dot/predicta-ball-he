@@ -40,9 +40,11 @@ export type MatchPrediction = {
   confidenceBand: string | null;
   factors: PredictionFactor[];
   reasons: string[];
+  explanationHe: string | null;
   computedAt: string | null;
   nextUpdateAt: string | null;
 };
+
 
 
 export type IncidentRow = {
@@ -370,7 +372,7 @@ export async function getMatchPrediction(matchRef: string): Promise<MatchPredict
   const { data } = await supabaseAdmin
     .from("predictions")
     .select(
-      "predicted_home_score, predicted_away_score, prob_home, prob_draw, prob_away, prob_goals_0_1, prob_goals_2_3, prob_goals_4_plus, confidence, confidence_band, factors, reason_lines_he, computed_at, next_update_at",
+      "predicted_home_score, predicted_away_score, prob_home, prob_draw, prob_away, prob_goals_0_1, prob_goals_2_3, prob_goals_4_plus, confidence, confidence_band, factors, reason_lines_he, explanation_he, computed_at, next_update_at",
     )
     .eq("match_id", match.id)
     .eq("model_version", MODEL_VERSION)
@@ -407,6 +409,10 @@ export async function getMatchPrediction(matchRef: string): Promise<MatchPredict
     confidenceBand: data.confidence_band ?? null,
     factors,
     reasons,
+    explanationHe:
+      typeof data.explanation_he === "string" && data.explanation_he.trim() !== ""
+        ? data.explanation_he.trim()
+        : null,
     computedAt: data.computed_at ?? null,
     nextUpdateAt: data.next_update_at ?? null,
   };
