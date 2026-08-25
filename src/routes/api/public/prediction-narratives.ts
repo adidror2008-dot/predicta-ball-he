@@ -13,12 +13,17 @@ export const Route = createFileRoute("/api/public/prediction-narratives")({
           });
         }
 
-        const input: { limit?: number; force?: boolean } = {};
+        const input: { limit?: number; force?: boolean; rephraseBefore?: string } = {};
         try {
-          const body = (await request.json()) as { limit?: number; force?: boolean } | null;
+          const body = (await request.json()) as {
+            limit?: number;
+            force?: boolean;
+            rephraseBefore?: string;
+          } | null;
           if (body && typeof body === "object") {
             if (typeof body.limit === "number") input.limit = body.limit;
             if (typeof body.force === "boolean") input.force = body.force;
+            if (typeof body.rephraseBefore === "string") input.rephraseBefore = body.rephraseBefore;
           }
         } catch {
           // no body — defaults apply

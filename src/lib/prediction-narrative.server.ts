@@ -21,6 +21,12 @@ export type PredictionNarrativeResult = {
   message?: string;
 };
 
+type PredictionNarrativeInput = {
+  limit?: number;
+  force?: boolean;
+  rephraseBefore?: string;
+};
+
 type Row = {
   id: string;
   match_id: string;
@@ -90,10 +96,10 @@ function toItem(row: Row, names: { home: string | null; away: string | null }) {
 }
 
 export async function runPredictionNarratives(
-  data: { limit?: number; force?: boolean } = {},
+  data: PredictionNarrativeInput = {},
 ): Promise<PredictionNarrativeResult> {
   const startedAt = new Date().toISOString();
-  const cap = Math.min(400, Math.max(1, data.limit ?? 100));
+  const cap = Math.min(800, Math.max(1, data.limit ?? 100));
 
   let candidates = 0;
   let updated = 0;
@@ -123,15 +129,21 @@ export async function runPredictionNarratives(
     };
   };
 
+  const selection =
+    data.rephraseBefore && !Number.isNaN(Date.parse(data.rephraseBefore))
+      ? `explanation_he.is.null,explanation_at.lt.${new Date(data.rephraseBefore).toISOString()}`
+      : null;
   let query = supabaseAdmin
     .from("predictions")
     .select(
       "id, match_id, predicted_home_score, predicted_away_score, prob_home, prob_draw, prob_away, prob_over_2_5, prob_btts, expected_total_goals, confidence, confidence_band, reason_lines_he",
     )
     .eq("model_version", MODEL_VERSION)
+    .order("explanation_he", { ascending: true, nullsFirst: true })
     .order("computed_at", { ascending: false })
     .limit(cap);
-  if (!data.force) query = query.is("explanation_he", null);
+  if (selection) query = query.or(selection);
+  else if (!data.force) query = query.is("explanation_he", null);
 
   const { data: rows, error } = await query;
   if (error) return await finish("failed", error.message);
@@ -244,12 +256,29 @@ export async function runPredictionNarratives(
           .filter((p) => p.id !== "" && p.text !== "");
       }
     } catch {
-      // A malformed batch is skipped, never guessed at; the rest of the run continues.
       parseFailures += 1;
-      continue;
+      return await finish(updated > 0 ? "partial" : "failed", "ai returned invalid JSON");
     }
 
     const known = new Set(batch.map((b) => b.id));
+    const returned = new Set(pairs.map((pair) => pair.id));
+    const validBatch =
+      pairs.length === batch.length &&
+      returned.size === batch.length &&
+      pairs.every(
+        (pair) =>
+          known.has(pair.id) &&
+          pair.text.length >= 10 &&
+          pair.text.length <= 700 &&
+          /[\u0590-\u05FF]/u.test(pair.text),
+      );
+    if (!validBatch) {
+      parseFailures += 1;
+      return await finish(updated > 0 ? "partial" : "failed", "ai returned an incomplete or invalid batch");
+    }
+
+    // Safety invariant: no existing explanation is cleared up front. Each row is
+    // replaced only after the complete AI batch has passed validation.
     const stamp = new Date().toISOString();
     for (const pair of pairs) {
       if (!known.has(pair.id)) continue;
