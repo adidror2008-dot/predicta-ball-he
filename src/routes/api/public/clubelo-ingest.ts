@@ -3,7 +3,10 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/api/public/clubelo-ingest")({
   server: {
     handlers: {
+      // Deployment probe: confirms this route exists in the running Worker build.
+      GET: async () => Response.json({ route: "clubelo-ingest", ready: true }),
       POST: async ({ request }) => {
+
         const expected = process.env["CRON_SECRET"];
         if (!expected || expected.trim() === "") {
           return Response.json({ error: "CRON_SECRET not configured" }, { status: 500 });
