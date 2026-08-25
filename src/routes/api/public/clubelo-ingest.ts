@@ -24,6 +24,9 @@ export const Route = createFileRoute("/api/public/clubelo-ingest")({
 
         try {
           const mod = await import("@/lib/clubelo-ingest.server");
+          if (body.step === "probe") {
+            return Response.json({ status: "ok", result: await mod.runClubEloProbe() });
+          }
           if (body.step === "match") {
             return Response.json({ status: "ok", result: await mod.runClubEloMatch() });
           }
