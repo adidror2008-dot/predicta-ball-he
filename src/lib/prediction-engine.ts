@@ -234,35 +234,45 @@ export function computePrediction(
   const prob4Plus = 1 - prob01 - prob23;
   const probUnder25 = 1 - probOver25;
 
-  // The displayed exact score must agree with the 1X2 winner: pick the most
-  // likely cell among the cells matching the most likely outcome.
-  // Tie-break: fewer total goals, then the home side.
+  // Most-likely goal bucket (used for display and to constrain the shown score).
+  const buckets: Record<'0-1' | '2-3' | '4+', number> = { '0-1': prob01, '2-3': prob23, '4+': prob4Plus };
+  const predictedGoalBucket = (Object.keys(buckets) as Array<'0-1' | '2-3' | '4+'>)
+    .reduce((a, b) => (buckets[a] >= buckets[b] ? a : b));
+
+  // The displayed exact score must never contradict the aggregate meters:
+  // pick the most likely cell that matches BOTH the 1X2 winner AND the modal
+  // goal bucket. Only the SELECTION of the shown cell changes — every
+  // probability above is untouched, so RPS/Brier/1X2 accuracy are unchanged.
   const outcome: 'home' | 'draw' | 'away' =
     probHome >= probDraw && probHome >= probAway
       ? 'home'
       : probAway >= probDraw
         ? 'away'
         : 'draw';
-  let bestI = 0, bestJ = 0, bestP = -1;
-  for (let i = 0; i <= grid; i++) {
-    for (let j = 0; j <= grid; j++) {
-      const matches = outcome === 'home' ? i > j : outcome === 'away' ? i < j : i === j;
-      if (!matches) continue;
-      const p = matrix[i]![j]!;
-      const total = i + j;
-      const bestTotal = bestI + bestJ;
-      const better =
-        bestP < 0 ||
-        p > bestP ||
-        (p === bestP && (total < bestTotal || (total === bestTotal && i > bestI)));
-      if (better) { bestP = p; bestI = i; bestJ = j; }
+  const bucketOf = (total: number): '0-1' | '2-3' | '4+' =>
+    total <= 1 ? '0-1' : total <= 3 ? '2-3' : '4+';
+  const pickCell = (requireBucket: boolean): { i: number; j: number } => {
+    let bi = -1, bj = -1, bp = -1;
+    for (let i = 0; i <= grid; i++) {
+      for (let j = 0; j <= grid; j++) {
+        const signOk = outcome === 'home' ? i > j : outcome === 'away' ? i < j : i === j;
+        if (!signOk) continue;
+        if (requireBucket && bucketOf(i + j) !== predictedGoalBucket) continue;
+        const p = matrix[i]![j]!;
+        const total = i + j;
+        const bestTotal = bi + bj;
+        const better =
+          bp < 0 || p > bp ||
+          (p === bp && (total < bestTotal || (total === bestTotal && i > bi)));
+        if (better) { bp = p; bi = i; bj = j; }
+      }
     }
-  }
-
-
-  const buckets: Record<'0-1' | '2-3' | '4+', number> = { '0-1': prob01, '2-3': prob23, '4+': prob4Plus };
-  const predictedGoalBucket = (Object.keys(buckets) as Array<'0-1' | '2-3' | '4+'>)
-    .reduce((a, b) => (buckets[a] >= buckets[b] ? a : b));
+    return { i: bi, j: bj };
+  };
+  let sel = pickCell(true);
+  if (sel.i < 0) sel = pickCell(false);
+  const bestI = sel.i;
+  const bestJ = sel.j;
 
   const decisiveness = clamp((Math.max(probHome, probDraw, probAway) - 1 / 3) / (1 - 1 / 3), 0, 1);
   const dataQuality = clamp((home.nEff + away.nEff) / 2 / cfg.historyMaxMatches, 0, 1) *
