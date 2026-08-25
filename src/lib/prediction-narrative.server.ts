@@ -17,6 +17,7 @@ export type PredictionNarrativeResult = {
   candidates: number;
   updated: number;
   ai_calls: number;
+  skipped: number;
   budget_exhausted: boolean;
   message?: string;
 };
@@ -98,6 +99,9 @@ function toItem(row: Row, names: { home: string | null; away: string | null }) {
 export async function runPredictionNarratives(
   data: PredictionNarrativeInput = {},
 ): Promise<PredictionNarrativeResult> {
+  const MAX_CONSECUTIVE_FAILURES = 3;
+  let consecutiveFailures = 0;
+  let skippedBatches = 0;
   const startedAt = new Date().toISOString();
   const cap = Math.min(800, Math.max(1, data.limit ?? 100));
 
@@ -117,13 +121,14 @@ export async function runPredictionNarratives(
       finished_at: new Date().toISOString(),
       status,
       result_metric: updated,
-      result_detail: { candidates, updated, ai_calls: aiCalls, parse_failures: parseFailures, budget_exhausted: budgetExhausted, message },
+      result_detail: { candidates, updated, ai_calls: aiCalls, skipped: skippedBatches, parse_failures: parseFailures, budget_exhausted: budgetExhausted, message },
     });
     return {
       status,
       candidates,
       updated,
       ai_calls: aiCalls,
+      skipped: skippedBatches,
       budget_exhausted: budgetExhausted,
       ...(message ? { message } : {}),
     };
@@ -226,10 +231,15 @@ export async function runPredictionNarratives(
       if (!res.ok) {
         const body = await res.text();
         aiCalls += 1;
-        return await finish(
-          updated > 0 ? "partial" : "failed",
-          `ai gateway ${res.status}: ${body.slice(0, 200)}`,
-        );
+        consecutiveFailures += 1;
+        skippedBatches += 1;
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+          return await finish(
+            updated > 0 ? "partial" : "failed",
+            `stopped after ${consecutiveFailures} consecutive batch failures; ai gateway ${res.status}: ${body.slice(0, 200)}`,
+          );
+        }
+        continue;
       }
       aiCalls += 1;
       const json = (await res.json()) as {
@@ -237,7 +247,15 @@ export async function runPredictionNarratives(
       };
       content = String(json.choices?.[0]?.message?.content ?? "");
     } catch (e) {
-      return await finish(updated > 0 ? "partial" : "failed", `ai gateway error: ${(e as Error).message}`);
+      consecutiveFailures += 1;
+      skippedBatches += 1;
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        return await finish(
+          updated > 0 ? "partial" : "failed",
+          `stopped after ${consecutiveFailures} consecutive batch failures; ai gateway error: ${(e as Error).message}`,
+        );
+      }
+      continue;
     }
 
     let pairs: Array<{ id: string; text: string }> = [];
@@ -257,7 +275,15 @@ export async function runPredictionNarratives(
       }
     } catch {
       parseFailures += 1;
-      return await finish(updated > 0 ? "partial" : "failed", "ai returned invalid JSON");
+      consecutiveFailures += 1;
+      skippedBatches += 1;
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        return await finish(
+          updated > 0 ? "partial" : "failed",
+          `stopped after ${consecutiveFailures} consecutive batch failures; ai returned invalid JSON`,
+        );
+      }
+      continue;
     }
 
     const known = new Set(batch.map((b) => b.id));
@@ -274,7 +300,15 @@ export async function runPredictionNarratives(
       );
     if (!validBatch) {
       parseFailures += 1;
-      return await finish(updated > 0 ? "partial" : "failed", "ai returned an incomplete or invalid batch");
+      consecutiveFailures += 1;
+      skippedBatches += 1;
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        return await finish(
+          updated > 0 ? "partial" : "failed",
+          `stopped after ${consecutiveFailures} consecutive batch failures; ai returned an incomplete or invalid batch`,
+        );
+      }
+      continue;
     }
 
     // Safety invariant: no existing explanation is cleared up front. Each row is
@@ -288,6 +322,7 @@ export async function runPredictionNarratives(
         .eq("id", pair.id);
       if (!updateError && (count ?? 0) > 0) updated += 1;
     }
+    consecutiveFailures = 0;
   }
 
   return await finish(updated === candidates ? "success" : "partial");
