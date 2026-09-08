@@ -52,9 +52,9 @@ export function MatchHeaderCard({
 
   const display = deriveDisplayStatus(header.status, header.kickoffAt);
   const isPostponed = display === "postponed";
-  const isPending = display === "pending";
+  const isAwaitingUpdate = display === "pending";
   const hasScore =
-    (header.isFinished || isPending) && header.homeScore !== null && header.awayScore !== null;
+    (header.isFinished || isAwaitingUpdate) && header.homeScore !== null && header.awayScore !== null;
   const date = isPostponed ? null : formatDate(header.kickoffAt);
   const time = isPostponed ? null : formatTime(header.kickoffAt);
 
@@ -79,7 +79,7 @@ export function MatchHeaderCard({
             <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-muted-foreground">
               הסתיים
             </span>
-          ) : isPending ? (
+          ) : isAwaitingUpdate ? (
             <span className="rounded-full bg-surface-2 px-2 py-0.5 text-center text-[11px] text-muted-foreground">
               ממתין לעדכון
             </span>
