@@ -126,7 +126,7 @@ describe("quota and failure handling", () => {
   it("pauses the provider for a bounded time on 429, longer for a monthly quota", () => {
     const monthly = pauseForResponse(429, '{"message":"You have exceeded the MONTHLY quota"}');
     const burst = pauseForResponse(429, "too many requests");
-    expect(monthly).toBe(6 * 3600_000);
+    expect(monthly).toBe(2 * 3600_000);
     expect(burst).toBe(10 * 60_000);
     expect(pauseForResponse(200, "ok")).toBeNull();
     expect(pauseForResponse(500, "err")).toBeNull();
