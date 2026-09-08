@@ -1,5 +1,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { MatchSnapshot } from "@/lib/notifications.server";
+import { noteProviderResponse, sofascoreGate } from "@/lib/provider-gate.server";
+import type { CatchUpResult } from "@/lib/catch-up-matches.server";
 
 const SOFASCORE_HOST = "sportapi7.p.rapidapi.com";
 const SOURCE = "sofascore";
@@ -17,6 +19,45 @@ const LINEUP_WINDOW_MIN_MS = 55 * 60 * 1000;
 const LINEUP_WINDOW_MAX_MS = 65 * 60 * 1000;
 const MAX_LINEUP_FETCHES = 4;
 const MAX_FINAL_FETCHES = 4;
+
+/**
+ * Catch-up piggybacks on the existing 2-minute tick schedule (no new cron job):
+ * at most once per CATCHUP_INTERVAL_MS, at most CATCHUP_CALLS_PER_SLOT provider
+ * requests per slot and CATCHUP_DAILY_CAP per UTC day — the rest of the non-live
+ * budget stays available for the daily sync / stats / lineup jobs.
+ */
+const CATCHUP_INTERVAL_MS = 15 * 60 * 1000;
+const CATCHUP_CALLS_PER_SLOT = 4;
+const CATCHUP_DAILY_CAP = 200;
+const CATCHUP_LAST_KEY = "catchup_last_run_at";
+const CATCHUP_DAILY_KEY = "catchup_daily_calls";
+
+async function maybeRunCatchUp(): Promise<CatchUpResult | { skipped: string } | null> {
+  const { data: rows } = await supabaseAdmin
+    .from("cron_config")
+    .select("key, value")
+    .in("key", [CATCHUP_LAST_KEY, CATCHUP_DAILY_KEY]);
+  const last = rows?.find((r) => r.key === CATCHUP_LAST_KEY)?.value;
+  if (last && Date.now() - Date.parse(last) < CATCHUP_INTERVAL_MS) return null;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const dailyRaw = rows?.find((r) => r.key === CATCHUP_DAILY_KEY)?.value ?? "";
+  const [dailyDay, dailyCountRaw] = dailyRaw.split(":");
+  const usedToday = dailyDay === today ? Number(dailyCountRaw) || 0 : 0;
+  const slot = Math.min(CATCHUP_CALLS_PER_SLOT, CATCHUP_DAILY_CAP - usedToday);
+
+  await supabaseAdmin
+    .from("cron_config")
+    .upsert({ key: CATCHUP_LAST_KEY, value: new Date().toISOString() }, { onConflict: "key" });
+  if (slot <= 0) return { skipped: "daily_cap_reached" };
+
+  const { runCatchUpMatches } = await import("@/lib/catch-up-matches.server");
+  const r = await runCatchUpMatches({ maxCalls: slot });
+  await supabaseAdmin
+    .from("cron_config")
+    .upsert({ key: CATCHUP_DAILY_KEY, value: `${today}:${usedToday + r.calls_used}` }, { onConflict: "key" });
+  return r;
+}
 
 export type TickResult = {
   status: "success" | "partial" | "failed";
@@ -73,14 +114,8 @@ export async function runTick(): Promise<TickResult> {
     });
   };
 
-  const takeBudget = async () => {
-    const { data: ok } = await supabaseAdmin.rpc("api_budget_take", {
-      p_provider: SOURCE,
-      p_category: "live",
-      p_count: 1,
-    });
-    return ok === true;
-  };
+  // Provider pause + live budget. A paused provider fails closed like an empty budget.
+  const takeBudget = async () => (await sofascoreGate("live")).allowed;
 
   const call = async (path: string) => {
     const res = await fetch(`https://${SOFASCORE_HOST}${path}`, {
@@ -88,6 +123,7 @@ export async function runTick(): Promise<TickResult> {
     });
     apiCalls += 1;
     const text = await res.text();
+    await noteProviderResponse(res.status, text);
     let json: Record<string, any> | null = null;
     try {
       json = JSON.parse(text) as Record<string, any>;
@@ -170,7 +206,16 @@ export async function runTick(): Promise<TickResult> {
   }
 
   if (active.length === 0 && lineupCandidates.length === 0) {
-    await finish("success", { reason: "nothing_active", api_calls: 0 });
+    // Quiet tick — the ideal moment for the bounded catch-up of old unresolved matches.
+    let catchUp: Awaited<ReturnType<typeof maybeRunCatchUp>> = null;
+    if (apiKey) {
+      try {
+        catchUp = await maybeRunCatchUp();
+      } catch (e) {
+        catchUp = { skipped: e instanceof Error ? e.message : "catch-up failed" };
+      }
+    }
+    await finish("success", { reason: "nothing_active", api_calls: 0, catch_up: catchUp });
     return baseResult("success", 0, "nothing_active");
   }
 
@@ -321,6 +366,8 @@ export async function runTick(): Promise<TickResult> {
       const ev = eventById.get(String(m.external_id));
       if (!ev) continue;
       const statusType: string | null = ev["status"]?.["type"] ?? null;
+      // Never overwrite a known state with null — no state from the provider means no write.
+      if (!statusType) continue;
       const { error } = await supabaseAdmin
         .from("matches")
         .update({
@@ -377,6 +424,16 @@ export async function runTick(): Promise<TickResult> {
     notificationDetail = { error: e instanceof Error ? e.message : "notifications failed" };
   }
 
+  // ---- STEP 5: bounded catch-up slot (its own 'bulk' budget; never touches the live reserve)
+  let catchUp: Awaited<ReturnType<typeof maybeRunCatchUp>> = null;
+  if (!budgetBlocked) {
+    try {
+      catchUp = await maybeRunCatchUp();
+    } catch (e) {
+      catchUp = { skipped: e instanceof Error ? e.message : "catch-up failed" };
+    }
+  }
+
   const detail = {
     notifications: notificationDetail,
     notifications_sent: notificationsSent,
@@ -390,6 +447,7 @@ export async function runTick(): Promise<TickResult> {
     lineups_prefetched: lineupsPrefetched,
     finals_fetched: finalsFetched,
     budget_blocked: budgetBlocked,
+    catch_up: catchUp,
   };
   const status = budgetBlocked ? "partial" : "success";
   await finish(status, detail);

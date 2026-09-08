@@ -83,6 +83,10 @@ function MatchesPanel({
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["matches-list", competitionId],
     queryFn: () => fetchMatches({ data: { competitionIds: [competitionId] } }),
+    // Re-read the database while the screen is open (scores settle in the
+    // background); the active tab refreshes every minute, others only on focus.
+    refetchInterval: active ? 60_000 : false,
+    refetchOnWindowFocus: true,
   });
 
   useEffect(() => {

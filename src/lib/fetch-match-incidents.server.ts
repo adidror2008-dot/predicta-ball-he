@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { noteProviderResponse, sofascoreGate } from "@/lib/provider-gate.server";
 
 const SOFASCORE_HOST = "sportapi7.p.rapidapi.com";
 const SOURCE = "sofascore";
@@ -52,10 +53,12 @@ function mapIncidentType(inc: AnyRec): string | null {
  */
 export async function runFetchMatchIncidents(data: {
   matchExternalId: string;
+  skipJobRun?: boolean;
 }): Promise<FetchMatchIncidentsResult> {
   const startedAt = new Date().toISOString();
   const matchExternalId = String(data.matchExternalId);
   const apiKey = process.env["SPORTAPI_API_KEY"];
+  const skipJobRun = data.skipJobRun === true;
 
   let matchId: string | null = null;
   let httpStatus: number | null = null;
@@ -72,6 +75,7 @@ export async function runFetchMatchIncidents(data: {
     status: JobRunStatus,
     error?: string,
   ): Promise<string | undefined> => {
+    if (skipJobRun) return undefined;
     const { error: jobError } = await supabaseAdmin.from("job_runs").insert({
       job_name: "fetch-match-incidents",
       started_at: startedAt,
@@ -148,16 +152,11 @@ export async function runFetchMatchIncidents(data: {
   }
   expectedGoals = Number(match.home_score) + Number(match.away_score);
 
-  // Budget gate.
-  const { data: allowed, error: budgetError } = await supabaseAdmin.rpc("api_budget_take", {
-    p_provider: SOURCE,
-    p_category: "bulk",
-    p_count: 1,
-  });
-  if (budgetError) return finish("failed", `budget: ${budgetError.message}`);
-  if (allowed !== true) {
+  // Gate — provider pause + budget.
+  const gate = await sofascoreGate("bulk");
+  if (!gate.allowed) {
     budgetExhausted = true;
-    return finish("skipped", "budget exhausted for category bulk");
+    return finish("skipped", gate.reason === "provider_paused" ? "provider paused" : "budget exhausted for category bulk");
   }
 
   // Single outgoing call. No retry.
@@ -167,6 +166,7 @@ export async function runFetchMatchIncidents(data: {
   );
   httpStatus = res.status;
   const body = await res.text();
+  await noteProviderResponse(res.status, body);
   if (!res.ok) {
     return finish("failed", `incidents http ${res.status}: ${body.slice(0, 200)}`);
   }

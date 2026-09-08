@@ -34,6 +34,9 @@ function MatchPage() {
   const { data: header, isPending } = useQuery({
     queryKey: ["match-header", id],
     queryFn: () => fetchHeader({ data: { matchExternalId: id } }),
+    // Status/score are settled by background jobs — keep the open page current.
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 
   return (

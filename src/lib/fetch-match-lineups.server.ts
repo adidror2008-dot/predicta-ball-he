@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { noteProviderResponse, sofascoreGate } from "@/lib/provider-gate.server";
 
 const SOFASCORE_HOST = "sportapi7.p.rapidapi.com";
 const SOURCE = "sofascore";
@@ -113,16 +114,11 @@ export async function runFetchMatchLineups(data: {
   if (!match) return finish("skipped", `match ${matchExternalId} not found in matches`);
   matchId = match.id;
 
-  // Budget gate — one outgoing call, one token.
-  const { data: allowed, error: budgetError } = await supabaseAdmin.rpc("api_budget_take", {
-    p_provider: SOURCE,
-    p_category: "lineups",
-    p_count: 1,
-  });
-  if (budgetError) return finish("failed", `budget: ${budgetError.message}`);
-  if (allowed !== true) {
+  // Gate — provider pause + budget; one outgoing call, one token.
+  const gate = await sofascoreGate("lineups");
+  if (!gate.allowed) {
     budgetExhausted = true;
-    return finish("skipped", "budget exhausted for category lineups");
+    return finish("skipped", gate.reason === "provider_paused" ? "provider paused" : "budget exhausted for category lineups");
   }
 
   // Single outgoing call. No retry.
@@ -132,6 +128,7 @@ export async function runFetchMatchLineups(data: {
   );
   httpStatus = res.status;
   const body = await res.text();
+  await noteProviderResponse(res.status, body);
   if (!res.ok) {
     return finish("failed", `lineups http ${res.status}: ${body.slice(0, 200)}`);
   }

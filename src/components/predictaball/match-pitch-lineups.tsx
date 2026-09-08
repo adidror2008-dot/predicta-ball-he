@@ -190,6 +190,12 @@ export function MatchPitchLineups({ matchRef }: { matchRef: string }) {
   const { data, isPending } = useQuery({
     queryKey: ["match-lineups", matchRef],
     queryFn: () => fetchLineups({ data: { matchExternalId: matchRef } }),
+    // Lineups are published/backfilled in the background — poll only while still empty.
+    refetchInterval: (q) => {
+      const d = q.state.data;
+      const n = (d?.homeTeam?.length ?? 0) + (d?.awayTeam?.length ?? 0);
+      return n === 0 ? 120_000 : false;
+    },
   });
   const { data: header } = useQuery({
     queryKey: ["match-header", matchRef],

@@ -13,6 +13,8 @@ export function MatchStatsTab({ matchRef }: { matchRef: string }) {
   const { data, isPending } = useQuery({
     queryKey: ["match-stats", matchRef],
     queryFn: () => fetchStats({ data: { matchExternalId: matchRef } }),
+    // Details arrive from the background catch-up — poll only while still empty.
+    refetchInterval: (q) => ((q.state.data?.length ?? 0) === 0 ? 120_000 : false),
   });
 
   if (isPending) {
