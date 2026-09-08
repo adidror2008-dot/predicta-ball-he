@@ -123,6 +123,55 @@ export function groupByCompetitionOldestFirst<T extends MatchLite>(matches: T[])
 }
 
 /**
+ * True round-robin across runs: start right AFTER the competition the previous
+ * run served last, so a small per-slot ceiling (4 calls, 5+ leagues) cannot
+ * starve the leagues at the end of the list forever.
+ */
+export function rotateAfter<T extends [string, unknown]>(groups: T[], lastServed: string | null): T[] {
+  if (!lastServed || groups.length < 2) return groups;
+  const idx = groups.findIndex(([id]) => id === lastServed);
+  if (idx < 0) return groups;
+  return [...groups.slice(idx + 1), ...groups.slice(0, idx + 1)];
+}
+
+/** Provider states whose score fields are real (fixture sync). */
+const FIXTURE_SCORED_TYPES = new Set(["finished", "inprogress", "interrupted", "suspended", "awarded"]);
+
+/**
+ * Status/score columns a fixture-sync upsert may write for one provider event.
+ * - No provider status  -> write neither (never regress a known state to null).
+ * - Scored state        -> status + both scores (a finished event without both
+ *                          scores writes only the status, keeping existing values).
+ * - Postponed/canceled  -> status + null scores (there is no result).
+ * - notstarted          -> status only; existing scores are left untouched.
+ */
+export function fixtureStateFields(ev: ProviderEvent): Record<string, string | number | null> {
+  const type = ev?.["status"]?.["type"];
+  if (typeof type !== "string" || type.length === 0) return {};
+  const home = ev["homeScore"]?.["current"];
+  const away = ev["awayScore"]?.["current"];
+  const hasScores = typeof home === "number" && typeof away === "number";
+  if (FIXTURE_SCORED_TYPES.has(type)) {
+    return hasScores ? { status: type, home_score: home, away_score: away } : { status: type };
+  }
+  if (type === "postponed" || type === "canceled" || type === "removed") {
+    return { status: type, home_score: null, away_score: null };
+  }
+  return { status: type };
+}
+
+/**
+ * A detail "checked" marker may be written only when the provider answered
+ * (2xx or a per-item 404) AND the fetcher persisted without a database error.
+ * Transient failures leave the marker empty so the item is retried later.
+ */
+export function shouldMarkChecked(jobStatus: string, httpStatus: number | null): boolean {
+  if (jobStatus !== "success" && jobStatus !== "skipped") return false;
+  if (httpStatus == null) return false;
+  return (httpStatus >= 200 && httpStatus < 300) || isUnavailableStatus(httpStatus);
+}
+
+/**
  * After applying one `events/last/{page}` page, decide whether a deeper page
  * is still worth fetching: only when an unresolved match is OLDER than the
  * oldest event on this page and the provider has another page.

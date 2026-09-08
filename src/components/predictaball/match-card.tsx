@@ -3,7 +3,11 @@ import { BallIcon } from "./ball-icon";
 import { MatchFollowBell } from "./follow-bell";
 import { LtrNum, LogoSlot } from "./ui-bits";
 import { cn } from "@/lib/utils";
-import { DISPLAY_STATUS_LABEL_HE, type MatchDisplayStatus } from "@/lib/match-display-status";
+import {
+  DISPLAY_STATUS_LABEL_HE,
+  PENDING_SCORE_LABEL_HE,
+  type MatchDisplayStatus,
+} from "@/lib/match-display-status";
 
 export type MatchStatus = MatchDisplayStatus;
 
@@ -33,6 +37,7 @@ const statusClass: Record<MatchStatus, string> = {
 
 export function MatchCard({ match }: { match: MatchCardData }) {
   const isPostponed = match.status === "postponed";
+  const isPendingUpdate = match.status === "pending";
   const hasScore =
     !isPostponed && match.homeScore !== null && match.awayScore !== null;
   const isFuture = match.status === "scheduled";
@@ -72,7 +77,7 @@ export function MatchCard({ match }: { match: MatchCardData }) {
           <span className="min-w-0 flex-1 truncate whitespace-nowrap text-start text-sm font-medium">{match.homeName}</span>
         </div>
 
-        <div className={cn("shrink-0 text-center", isPostponed ? "w-24" : "w-14")}>
+        <div className={cn("shrink-0 text-center", isPostponed || isPendingUpdate ? "w-24" : "w-14")}>
           {isPostponed ? (
             <span className="block text-[11px] leading-tight text-muted-foreground">
               מועד חדש טרם נקבע
@@ -84,10 +89,17 @@ export function MatchCard({ match }: { match: MatchCardData }) {
                   {match.minute}׳
                 </LtrNum>
               ) : null}
-              <LtrNum className="text-lg font-bold">
+              <LtrNum className={cn("text-lg font-bold", isPendingUpdate && "text-muted-foreground")}>
                 {match.awayScore} - {match.homeScore}
               </LtrNum>
+              {isPendingUpdate ? (
+                <span className="text-[10px] leading-tight text-muted-foreground">
+                  {PENDING_SCORE_LABEL_HE}
+                </span>
+              ) : null}
             </div>
+          ) : isPendingUpdate ? (
+            <span className="text-sm text-muted-foreground">—</span>
           ) : isFuture && match.date ? (
             <div className="flex flex-col items-center gap-0.5">
               <LtrNum className="text-[13px] font-medium text-foreground">{match.date}</LtrNum>
