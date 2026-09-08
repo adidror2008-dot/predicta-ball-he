@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { PROVIDER_KEY_MAP, parseStatValue } from "@/lib/match-stats-keys";
+import { noteProviderResponse, sofascoreGate } from "@/lib/provider-gate.server";
 
 const SOFASCORE_HOST = "sportapi7.p.rapidapi.com";
 const SOURCE = "sofascore";
@@ -35,8 +36,10 @@ type MatchRow = {
 export async function runFetchMatchStats(data: {
   matchExternalId?: string;
   limit?: number;
+  skipJobRun?: boolean;
 }): Promise<FetchMatchStatsResult> {
   const startedAt = new Date().toISOString();
+  const skipJobRun = data.skipJobRun === true;
   const apiKey = process.env["SPORTAPI_API_KEY"];
 
   let matchesConsidered = 0;
@@ -50,6 +53,17 @@ export async function runFetchMatchStats(data: {
     message?: string,
   ): Promise<FetchMatchStatsResult> => {
     let jobRunError: string | undefined;
+    if (skipJobRun) {
+      return {
+        status,
+        matches_considered: matchesConsidered,
+        matches_saved: matchesSaved,
+        rows_inserted: rowsInserted,
+        budget_exhausted: budgetExhausted,
+        http_statuses: httpStatuses,
+        ...(message ? { message } : {}),
+      };
+    }
     const { error: jobError } = await supabaseAdmin.from("job_runs").insert({
       job_name: "fetch-match-stats",
       started_at: startedAt,
@@ -123,13 +137,8 @@ export async function runFetchMatchStats(data: {
     const externalId = match.external_id;
     if (!externalId) continue;
 
-    const { data: allowed, error: budgetError } = await supabaseAdmin.rpc("api_budget_take", {
-      p_provider: SOURCE,
-      p_category: "bulk",
-      p_count: 1,
-    });
-    if (budgetError) return finish("failed", `budget: ${budgetError.message}`);
-    if (allowed !== true) {
+    const gate = await sofascoreGate("bulk");
+    if (!gate.allowed) {
       budgetExhausted = true;
       break;
     }
@@ -141,9 +150,14 @@ export async function runFetchMatchStats(data: {
     );
     httpStatuses.push(res.status);
     if (!res.ok) {
+      const body = await res.text();
+      await noteProviderResponse(res.status, body);
       hadFailure = true;
-      continue;
+      // 404 = no statistics for this match; anything else is a provider failure — stop, no loop.
+      if (res.status === 404) continue;
+      return finish(matchesSaved > 0 ? "partial" : "failed", `statistics http ${res.status}: ${body.slice(0, 160)}`);
     }
+    await noteProviderResponse(res.status, "");
 
     let json: AnyRec;
     try {

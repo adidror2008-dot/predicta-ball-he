@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { noteProviderResponse, sofascoreGate } from "@/lib/provider-gate.server";
 
 const SOFASCORE_HOST = "sportapi7.p.rapidapi.com";
 const MAX_PAGES = 15;
@@ -101,14 +102,8 @@ export async function runSyncCompetition(data: {
   }
   const seasonId = String(comp.current_season_id);
 
-  const takeBudget = async () => {
-    const { data: ok } = await supabaseAdmin.rpc("api_budget_take", {
-      p_provider: "sofascore",
-      p_category: "bulk",
-      p_count: 1,
-    });
-    return ok === true;
-  };
+  // Provider pause + bulk budget; a paused provider fails closed like an empty budget.
+  const takeBudget = async () => (await sofascoreGate("bulk")).allowed;
 
   const call = async (path: string) => {
     const res = await fetch(`https://${SOFASCORE_HOST}${path}`, {
@@ -116,6 +111,7 @@ export async function runSyncCompetition(data: {
     });
     apiCalls += 1;
     const body = await res.text();
+    await noteProviderResponse(res.status, body);
     let json: Record<string, any> | null = null;
     try {
       json = JSON.parse(body) as Record<string, any>;
