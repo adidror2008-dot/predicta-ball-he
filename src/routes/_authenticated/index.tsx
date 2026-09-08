@@ -20,6 +20,7 @@ import { StandingsButton, StandingsSheet } from "@/components/predictaball/stand
 import { getMatchesListFn } from "@/lib/matches-list.functions";
 import { getCompetitionsListFn } from "@/lib/competitions-list.functions";
 import { applyOrder, useChipPrefs } from "@/lib/chip-prefs";
+import { deriveDisplayStatus } from "@/lib/match-display-status";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -43,13 +44,10 @@ const TAB_KEY = "pb:matches:activeCompetition";
 const SCROLL_OFFSET = 12;
 const PAST_MATCHES_ABOVE = 2;
 
-function toStatus(status: string | null): MatchStatus {
-  if (status === "postponed") return "postponed";
-  if (status === "finished" || status === "ended" || status === "afterET" || status === "ap") {
-    return "finished";
-  }
-  if (status === "inprogress" || status === "live" || status === "halftime") return "live";
-  return "scheduled";
+// Shared derivation: a non-final provider status older than 4h is presented
+// as "ממתין לעדכון" instead of a misleading live/upcoming label.
+function toStatus(status: string | null, kickoffAt?: string | null): MatchStatus {
+  return deriveDisplayStatus(status, kickoffAt ?? null);
 }
 
 function formatDate(iso: string) {
@@ -109,21 +107,21 @@ function MatchesPanel({
     awayScore: m.awayScore,
     kickoffTime: formatTime(m.kickoffAt),
     date: formatDate(m.kickoffAt),
-    status: toStatus(m.status),
+    status: toStatus(m.status, m.kickoffAt),
     minute: m.minute ?? null,
   });
 
   const { finished, upcoming, postponed } = useMemo(() => {
     const sorted = [...matches].sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt));
     return {
-      finished: sorted.filter((m) => toStatus(m.status) === "finished").map(toCard),
+      finished: sorted.filter((m) => toStatus(m.status, m.kickoffAt) === "finished").map(toCard),
       upcoming: sorted
         .filter((m) => {
-          const s = toStatus(m.status);
+          const s = toStatus(m.status, m.kickoffAt);
           return s !== "finished" && s !== "postponed";
         })
         .map(toCard),
-      postponed: sorted.filter((m) => toStatus(m.status) === "postponed").map(toCard),
+      postponed: sorted.filter((m) => toStatus(m.status, m.kickoffAt) === "postponed").map(toCard),
     };
   }, [matches]);
 
