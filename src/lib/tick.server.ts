@@ -2,6 +2,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { MatchSnapshot } from "@/lib/notifications.server";
 import { noteProviderResponse, sofascoreGate } from "@/lib/provider-gate.server";
 import type { CatchUpResult } from "@/lib/catch-up-matches.server";
+import { buildScoreUpdate } from "@/lib/catch-up/plan";
 
 const SOFASCORE_HOST = "sportapi7.p.rapidapi.com";
 const SOURCE = "sofascore";
@@ -365,18 +366,12 @@ export async function runTick(): Promise<TickResult> {
     for (const m of matches) {
       const ev = eventById.get(String(m.external_id));
       if (!ev) continue;
-      const statusType: string | null = ev["status"]?.["type"] ?? null;
-      // Never overwrite a known state with null — no state from the provider means no write.
-      if (!statusType) continue;
+      // Shared rule: no provider state -> no write; "finished" needs both scores.
+      const built = buildScoreUpdate(m, ev, new Date().toISOString());
+      if (!built) continue;
       const { error } = await supabaseAdmin
         .from("matches")
-        .update({
-          status: statusType,
-          home_score: ev["homeScore"]?.["current"] ?? null,
-          away_score: ev["awayScore"]?.["current"] ?? null,
-          minute: null,
-          fetched_at: new Date().toISOString(),
-        })
+        .update(built.update as never)
         .eq("id", m.id);
       if (!error) matchesSettled += 1;
     }
@@ -401,15 +396,11 @@ export async function runTick(): Promise<TickResult> {
     finalsFetched += 1;
     const ev = res.json?.["event"] as Record<string, any> | undefined;
     if (!res.ok || !ev) continue;
+    const built = buildScoreUpdate(m, ev, new Date().toISOString());
+    if (!built) continue;
     const { error } = await supabaseAdmin
       .from("matches")
-      .update({
-        status: ev["status"]?.["type"] ?? m.status,
-        home_score: ev["homeScore"]?.["current"] ?? null,
-        away_score: ev["awayScore"]?.["current"] ?? null,
-        minute: null,
-        fetched_at: new Date().toISOString(),
-      })
+      .update(built.update as never)
       .eq("id", m.id);
     if (!error) matchesSettled += 1;
   }

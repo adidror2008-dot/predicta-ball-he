@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { noteProviderResponse, sofascoreGate } from "@/lib/provider-gate.server";
+import { fixtureStateFields } from "@/lib/catch-up/plan";
 
 const SOFASCORE_HOST = "sportapi7.p.rapidapi.com";
 const MAX_PAGES = 15;
@@ -27,7 +28,7 @@ export type SyncResult = {
   message?: string;
 };
 
-const FINISHED_TYPES = new Set(["finished", "inprogress", "interrupted", "suspended"]);
+
 
 function isQualifier(roundInfo: Record<string, any> | null | undefined): boolean {
   const text = `${roundInfo?.["slug"] ?? ""} ${roundInfo?.["name"] ?? ""}`.toLowerCase();
@@ -199,8 +200,6 @@ export async function runSyncCompetition(data: {
 
         const roundInfo = ev["roundInfo"] as Record<string, any> | undefined;
         const qualifier = isQualifier(roundInfo);
-        const statusType: string | null = ev["status"]?.["type"] ?? null;
-        const scored = statusType != null && FINISHED_TYPES.has(statusType);
         const startTimestamp = ev["startTimestamp"];
         const previousLeg = ev["previousLegEventId"] != null ? String(ev["previousLegEventId"]) : null;
 
@@ -209,6 +208,8 @@ export async function runSyncCompetition(data: {
 
         const venueName: string | null = ev["venue"]?.["stadium"]?.["name"] ?? null;
 
+        // Status/scores are written only as far as the provider actually reports
+        // them — a fixture page never regresses a stored result to null.
         const payload: Record<string, any> = {
           external_id: String(ev["id"]),
           source: "sofascore",
@@ -217,9 +218,7 @@ export async function runSyncCompetition(data: {
           away_team_id: awayId,
           kickoff_at: startTimestamp ? new Date(Number(startTimestamp) * 1000).toISOString() : null,
           time_confirmed: startTimestamp != null && ev["timeConfirmed"] === true,
-          status: statusType,
-          home_score: scored ? (ev["homeScore"]?.["current"] ?? null) : null,
-          away_score: scored ? (ev["awayScore"]?.["current"] ?? null) : null,
+          ...fixtureStateFields(ev),
           round: roundInfo?.["round"] != null ? String(roundInfo["round"]) : null,
           round_number: roundInfo?.["round"] != null ? Number(roundInfo["round"]) : null,
           round_name: roundInfo?.["name"] ?? null,

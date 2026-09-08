@@ -3,12 +3,15 @@ import {
   buildScoreUpdate,
   detailNeeds,
   effectiveCallCeiling,
+  fixtureStateFields,
   groupByCompetitionOldestFirst,
   isProviderFailure,
   isUnavailableStatus,
   isUnresolvedPast,
   nextPageAfter,
   pauseForResponse,
+  rotateAfter,
+  shouldMarkChecked,
   stuckBucket,
   type MatchLite,
 } from "./plan";
@@ -158,5 +161,73 @@ describe("missing-detail recovery is idempotent", () => {
   it("never asks for incidents without a known final score and never for unfinished matches", () => {
     expect(detailNeeds({ ...finished, home_score: null })).toEqual(["lineups", "stats"]);
     expect(detailNeeds({ ...finished, status: "notstarted" })).toEqual([]);
+  });
+});
+
+describe("fairness across runs (round-robin cursor)", () => {
+  const league = (id: string, n: number, oldestH: number) =>
+    Array.from({ length: n }, (_, i) => base({ id: `${id}-${i}`, competition_id: id, kickoff_at: hoursAgo(oldestH - i) }));
+
+  it("starts after the competition served last", () => {
+    const groups = groupByCompetitionOldestFirst([...league("A", 2, 300), ...league("B", 2, 200), ...league("C", 2, 100)]);
+    expect(rotateAfter(groups, null).map(([id]) => id)).toEqual(["A", "B", "C"]);
+    expect(rotateAfter(groups, "A").map(([id]) => id)).toEqual(["B", "C", "A"]);
+    expect(rotateAfter(groups, "C").map(([id]) => id)).toEqual(["A", "B", "C"]);
+    expect(rotateAfter(groups, "gone").map(([id]) => id)).toEqual(["A", "B", "C"]);
+  });
+
+  it("makes progress on every league with 4-call slots and a >20 match backlog (no starvation)", () => {
+    // 6 leagues, 5 of them with >20 unresolved matches older than 4h; each page resolves nothing (worst case).
+    const leagues = ["BR", "L1", "BUN", "ERE", "ISR", "X"];
+    const all = leagues.flatMap((id, i) => league(id, i === 5 ? 3 : 24, 400 - i * 10));
+    const groups = groupByCompetitionOldestFirst(all);
+    const served = new Map<string, number>();
+    let cursor: string | null = null;
+    for (let slot = 0; slot < 3; slot += 1) {
+      let calls = 4;
+      for (const [id] of rotateAfter(groups, cursor)) {
+        if (calls === 0) break;
+        calls -= 1;
+        served.set(id, (served.get(id) ?? 0) + 1);
+        cursor = id;
+      }
+    }
+    // 12 calls over 6 leagues: every league served exactly twice — including the last two.
+    for (const id of leagues) expect(served.get(id)).toBe(2);
+  });
+});
+
+describe("fixture sync never regresses stored results", () => {
+  it("writes nothing for an event without a provider status", () => {
+    expect(fixtureStateFields({ homeScore: { current: 1 }, awayScore: { current: 0 } })).toEqual({});
+    expect(fixtureStateFields({ status: {} })).toEqual({});
+  });
+
+  it("writes both scores only when both exist; a finished event with a missing score keeps stored scores", () => {
+    expect(fixtureStateFields({ status: { type: "finished" }, homeScore: { current: 2 }, awayScore: { current: 1 } })).toEqual({
+      status: "finished",
+      home_score: 2,
+      away_score: 1,
+    });
+    expect(fixtureStateFields({ status: { type: "finished" }, homeScore: { current: 2 }, awayScore: {} })).toEqual({ status: "finished" });
+  });
+
+  it("does not null out scores for notstarted rows, but does for postponed", () => {
+    expect(fixtureStateFields({ status: { type: "notstarted" }, homeScore: {}, awayScore: {} })).toEqual({ status: "notstarted" });
+    expect(fixtureStateFields({ status: { type: "postponed" } })).toEqual({ status: "postponed", home_score: null, away_score: null });
+  });
+});
+
+describe("checked markers only after a successful provider answer AND a successful DB write", () => {
+  it("marks on success/skipped with 2xx or per-item 404", () => {
+    expect(shouldMarkChecked("success", 200)).toBe(true);
+    expect(shouldMarkChecked("skipped", 404)).toBe(true);
+  });
+
+  it("does not mark when the fetcher reported a failed/partial DB write or no provider answer", () => {
+    expect(shouldMarkChecked("failed", 200)).toBe(false);
+    expect(shouldMarkChecked("partial", 200)).toBe(false);
+    expect(shouldMarkChecked("success", null)).toBe(false);
+    expect(shouldMarkChecked("success", 500)).toBe(false);
   });
 });

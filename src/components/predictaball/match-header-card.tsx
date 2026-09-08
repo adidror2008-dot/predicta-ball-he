@@ -2,7 +2,11 @@ import { CalendarDays, Clock, MapPin } from "lucide-react";
 import { LogoSlot, LtrNum, SkeletonBlock } from "./ui-bits";
 import { VenueText } from "./venue-text";
 import type { MatchHeader } from "@/lib/match-details-read.server";
-import { deriveDisplayStatus } from "@/lib/match-display-status";
+import {
+  DISPLAY_STATUS_LABEL_HE,
+  PENDING_SCORE_LABEL_HE,
+  deriveDisplayStatus,
+} from "@/lib/match-display-status";
 
 function formatDate(iso: string | null) {
   if (!iso) return null;
@@ -77,12 +81,19 @@ export function MatchHeaderCard({
           )}
           {header.isFinished && hasScore ? (
             <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-muted-foreground">
-              הסתיים
+              {DISPLAY_STATUS_LABEL_HE.finished}
             </span>
           ) : isAwaitingUpdate ? (
-            <span className="rounded-full bg-surface-2 px-2 py-0.5 text-center text-[11px] text-muted-foreground">
-              ממתין לעדכון
-            </span>
+            <>
+              <span className="rounded-full bg-surface-2 px-2 py-0.5 text-center text-[11px] text-muted-foreground">
+                {DISPLAY_STATUS_LABEL_HE.pending}
+              </span>
+              {hasScore ? (
+                <span className="text-center text-[10px] leading-tight text-muted-foreground">
+                  {PENDING_SCORE_LABEL_HE}
+                </span>
+              ) : null}
+            </>
           ) : null}
         </div>
 

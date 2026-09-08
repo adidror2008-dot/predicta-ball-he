@@ -13,6 +13,8 @@ import {
   isUnavailableStatus,
   isUnresolvedPast,
   nextPageAfter,
+  rotateAfter,
+  shouldMarkChecked,
   stuckBucket,
   type MatchLite,
 } from "@/lib/catch-up/plan";
@@ -20,6 +22,8 @@ import {
 const SOFASCORE_HOST = "sportapi7.p.rapidapi.com";
 const SOURCE = "sofascore";
 const PROGRESS_PREFIX = "catchup_page:";
+/** Competition served last by Stage A — the next run starts after it (round-robin across runs). */
+const RR_CURSOR_KEY = "catchup_rr_cursor";
 /** Individual /event lookups per run for matches the league result pages did not contain. */
 const MAX_INDIVIDUAL_PER_RUN = 6;
 /** Finished matches examined for missing details per run. */
@@ -276,10 +280,18 @@ export async function runCatchUpMatches(options: {
       return true;
     };
 
-    // A1 — league result pages, fair order, one page per competition per pass.
-    const groups = groupByCompetitionOldestFirst(unresolved);
+    // A1 — league result pages, one page per competition per pass. The order is
+    // oldest-first, rotated to start after the competition served last time, so
+    // every league gets a turn even with a 4-call slot.
+    const { data: cursorRow } = await supabaseAdmin
+      .from("cron_config")
+      .select("value")
+      .eq("key", RR_CURSOR_KEY)
+      .maybeSingle();
+    const groups = rotateAfter(groupByCompetitionOldestFirst(unresolved), cursorRow?.value ?? null);
     const pageState = new Map<string, number | null>();
     for (const [compId] of groups) pageState.set(compId, await readProgress(compId));
+    let lastServed: string | null = null;
 
     for (let pass = 0; pass < 2 && !providerError && callsLeft() > 0; pass += 1) {
       for (const [compId, list] of groups) {
@@ -305,6 +317,7 @@ export async function runCatchUpMatches(options: {
           `/api/v1/unique-tournament/${comp.tournament_id}/season/${comp.current_season_id}/events/last/${page}`,
         );
         if (!res) break;
+        lastServed = compId;
         if (pass === 0) result.scores.competitions_touched += 1;
         if (isUnavailableStatus(res.status)) {
           // No (more) finished events for this season — nothing to page through.
@@ -329,6 +342,11 @@ export async function runCatchUpMatches(options: {
         pageState.set(compId, next);
         await writeProgress(compId, next);
       }
+    }
+    if (lastServed) {
+      await supabaseAdmin
+        .from("cron_config")
+        .upsert({ key: RR_CURSOR_KEY, value: lastServed }, { onConflict: "key" });
     }
 
     // A2 — matches the result pages did not contain: individual lookups, least-recently tried first.
@@ -457,10 +475,13 @@ export async function runCatchUpMatches(options: {
           result.details.lineups_rows += r.lineups_upserted;
           result.details.ratings_rows += r.ratings_upserted;
           if (r.lineups_upserted === 0) result.details.unavailable += 1;
-          await supabaseAdmin
-            .from("matches")
-            .update({ ratings_checked_at: new Date().toISOString() })
-            .eq("id", m.id);
+          // Marker only after the fetcher persisted without a DB error; otherwise retry later.
+          if (shouldMarkChecked(r.status, r.http_status)) {
+            await supabaseAdmin
+              .from("matches")
+              .update({ ratings_checked_at: new Date().toISOString() })
+              .eq("id", m.id);
+          }
         } else if (kind === "stats") {
           const r = await runFetchMatchStats({ matchExternalId: ext, skipJobRun: true });
           const http = r.http_statuses[0] ?? null;
@@ -479,10 +500,12 @@ export async function runCatchUpMatches(options: {
           result.details.stats_fetched += 1;
           result.details.stats_rows += r.rows_inserted;
           if (r.rows_inserted === 0) result.details.unavailable += 1;
-          await supabaseAdmin
-            .from("matches")
-            .update({ stats_checked_at: new Date().toISOString() })
-            .eq("id", m.id);
+          if (shouldMarkChecked(r.status, http)) {
+            await supabaseAdmin
+              .from("matches")
+              .update({ stats_checked_at: new Date().toISOString() })
+              .eq("id", m.id);
+          }
         } else {
           const r = await runFetchMatchIncidents({ matchExternalId: ext, skipJobRun: true });
           if (r.http_status != null) {
@@ -500,10 +523,12 @@ export async function runCatchUpMatches(options: {
           result.details.incidents_fetched += 1;
           result.details.events_rows += r.events_saved;
           if (r.events_saved === 0) result.details.unavailable += 1;
-          await supabaseAdmin
-            .from("matches")
-            .update({ incidents_checked_at: new Date().toISOString() })
-            .eq("id", m.id);
+          if (shouldMarkChecked(r.status, r.http_status)) {
+            await supabaseAdmin
+              .from("matches")
+              .update({ incidents_checked_at: new Date().toISOString() })
+              .eq("id", m.id);
+          }
         }
       }
     }

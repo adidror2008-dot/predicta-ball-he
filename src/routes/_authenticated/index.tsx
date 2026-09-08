@@ -12,7 +12,7 @@ import {
   CompetitionPickerSheet,
   type PickerCompetition,
 } from "@/components/predictaball/competition-picker-sheet";
-import { MatchCard, type MatchCardData, type MatchStatus } from "@/components/predictaball/match-card";
+import { MatchCard, type MatchCardData } from "@/components/predictaball/match-card";
 import { EmptyState, SkeletonBlock } from "@/components/predictaball/ui-bits";
 import { SwipeDeck } from "@/components/predictaball/swipe-deck";
 import { StandingsButton, StandingsSheet } from "@/components/predictaball/standings-sheet";
@@ -20,7 +20,12 @@ import { StandingsButton, StandingsSheet } from "@/components/predictaball/stand
 import { getMatchesListFn } from "@/lib/matches-list.functions";
 import { getCompetitionsListFn } from "@/lib/competitions-list.functions";
 import { applyOrder, useChipPrefs } from "@/lib/chip-prefs";
-import { deriveDisplayStatus } from "@/lib/match-display-status";
+import {
+  groupMatches,
+  SECTION_ORDER,
+  SECTION_TITLE_HE,
+  type MatchDisplayStatus,
+} from "@/lib/match-display-status";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -43,11 +48,17 @@ export const Route = createFileRoute("/_authenticated/")({
 const TAB_KEY = "pb:matches:activeCompetition";
 const SCROLL_OFFSET = 12;
 const PAST_MATCHES_ABOVE = 2;
+const CLOCK_MS = 60_000;
 
-// Shared derivation: a non-final provider status older than 4h is presented
-// as "ממתין לעדכון" instead of a misleading live/upcoming label.
-function toStatus(status: string | null, kickoffAt?: string | null): MatchStatus {
-  return deriveDisplayStatus(status, kickoffAt ?? null);
+/** Wall clock that ticks every minute so time-based classification is
+ *  re-evaluated even when polling returns structurally identical rows. */
+function useNowMs(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), CLOCK_MS);
+    return () => clearInterval(id);
+  }, []);
+  return now;
 }
 
 function formatDate(iso: string) {
@@ -96,8 +107,11 @@ function MatchesPanel({
   }, [isFetching, active, onFetchingChange]);
 
   const matches = useMemo(() => data ?? [], [data]);
+  const nowMs = useNowMs();
 
-  const toCard = (m: (typeof matches)[number]): MatchCardData => ({
+  const toCard = (
+    m: (typeof matches)[number] & { display: MatchDisplayStatus },
+  ): MatchCardData => ({
     id: m.id,
     homeName: m.homeName,
     awayName: m.awayName,
@@ -107,36 +121,36 @@ function MatchesPanel({
     awayScore: m.awayScore,
     kickoffTime: formatTime(m.kickoffAt),
     date: formatDate(m.kickoffAt),
-    status: toStatus(m.status, m.kickoffAt),
+    status: m.display,
     minute: m.minute ?? null,
   });
 
-  const { finished, upcoming, postponed } = useMemo(() => {
-    const sorted = [...matches].sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt));
+  // One shared classification (grouping + badge), re-evaluated on the clock.
+  const sections = useMemo(() => {
+    const g = groupMatches(matches, nowMs);
     return {
-      finished: sorted.filter((m) => toStatus(m.status, m.kickoffAt) === "finished").map(toCard),
-      upcoming: sorted
-        .filter((m) => {
-          const s = toStatus(m.status, m.kickoffAt);
-          return s !== "finished" && s !== "postponed";
-        })
-        .map(toCard),
-      postponed: sorted.filter((m) => toStatus(m.status, m.kickoffAt) === "postponed").map(toCard),
+      finished: g.finished.map(toCard),
+      pending: g.pending.map(toCard),
+      live: g.live.map(toCard),
+      upcoming: g.upcoming.map(toCard),
+      postponed: g.postponed.map(toCard),
     };
-  }, [matches]);
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matches, nowMs]);
 
   const seasonNotice = useMemo(() => {
     const first = matches.find((m) => !m.isCurrentSeason && m.seasonLabel);
     return first?.seasonLabel ?? null;
   }, [matches]);
 
-  // The list opens on the divider, keeping two finished matches visible above.
+  // The list opens on the first live/upcoming match, keeping two past matches visible above.
   const scrollTargetId = useMemo(() => {
-    if (finished.length === 0) return upcoming[0]?.id ?? null;
-    const index = Math.max(0, finished.length - PAST_MATCHES_ABOVE);
-    return finished[index]?.id ?? finished[finished.length - 1]!.id;
-  }, [finished, upcoming]);
+    const past = [...sections.finished, ...sections.pending];
+    const next = sections.live[0] ?? sections.upcoming[0] ?? null;
+    if (past.length === 0) return next?.id ?? null;
+    const index = Math.max(0, past.length - PAST_MATCHES_ABOVE);
+    return past[index]?.id ?? past[past.length - 1]!.id;
+  }, [sections]);
 
   useEffect(() => {
     if (!active || isLoading || !hydrated || !scrollTargetId) return;
@@ -161,7 +175,7 @@ function MatchesPanel({
     );
   }
 
-  if (finished.length === 0 && upcoming.length === 0 && postponed.length === 0) {
+  if (SECTION_ORDER.every((s) => sections[s].length === 0)) {
     return <EmptyState text="אין משחקים להצגה כרגע" />;
   }
 
@@ -173,33 +187,25 @@ function MatchesPanel({
         </p>
       ) : null}
 
-      {finished.map((m) => (
-        <MatchCard key={m.id} match={m} />
-      ))}
-
-      {upcoming.length > 0 ? (
-        <div className="flex items-center gap-3 py-1">
-          <span className="h-px flex-1 bg-border" aria-hidden />
-          <span className="text-xs font-medium text-muted-foreground">משחקים קרובים</span>
-          <span className="h-px flex-1 bg-border" aria-hidden />
-        </div>
-      ) : null}
-
-      {upcoming.map((m) => (
-        <MatchCard key={m.id} match={m} />
-      ))}
-
-      {postponed.length > 0 ? (
-        <div className="flex items-center gap-3 py-1">
-          <span className="h-px flex-1 bg-border" aria-hidden />
-          <span className="text-xs font-medium text-muted-foreground">משחקים שנדחו</span>
-          <span className="h-px flex-1 bg-border" aria-hidden />
-        </div>
-      ) : null}
-
-      {postponed.map((m) => (
-        <MatchCard key={m.id} match={m} />
-      ))}
+      {SECTION_ORDER.map((section) => {
+        const list = sections[section];
+        if (list.length === 0) return null;
+        const title = SECTION_TITLE_HE[section];
+        return (
+          <div key={section} className="space-y-3" data-section={section}>
+            {title ? (
+              <div className="flex items-center gap-3 py-1">
+                <span className="h-px flex-1 bg-border" aria-hidden />
+                <span className="text-xs font-medium text-muted-foreground">{title}</span>
+                <span className="h-px flex-1 bg-border" aria-hidden />
+              </div>
+            ) : null}
+            {list.map((m) => (
+              <MatchCard key={m.id} match={m} />
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
