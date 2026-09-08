@@ -2,7 +2,9 @@
  * Pure planning helpers for the stuck-match catch-up. No I/O — unit tested.
  */
 
-export const PAUSE_MONTHLY_MS = 6 * 60 * 60 * 1000;
+/** Observed: the provider intermittently lets a few calls through even while "monthly" is exceeded,
+ *  so probe again after 2h (≤12 wasted requests/day when fully blocked). */
+export const PAUSE_MONTHLY_MS = 2 * 60 * 60 * 1000;
 export const PAUSE_RATE_LIMIT_MS = 10 * 60 * 1000;
 
 /** Cooldown for a provider response: 429 -> bounded pause (longer for a monthly quota). Never permanent. */
