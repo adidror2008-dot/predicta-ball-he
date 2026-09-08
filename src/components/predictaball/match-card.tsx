@@ -3,8 +3,9 @@ import { BallIcon } from "./ball-icon";
 import { MatchFollowBell } from "./follow-bell";
 import { LtrNum, LogoSlot } from "./ui-bits";
 import { cn } from "@/lib/utils";
+import { DISPLAY_STATUS_LABEL_HE, type MatchDisplayStatus } from "@/lib/match-display-status";
 
-export type MatchStatus = "scheduled" | "live" | "finished" | "postponed";
+export type MatchStatus = MatchDisplayStatus;
 
 export type MatchCardData = {
   id: string;
@@ -20,19 +21,14 @@ export type MatchCardData = {
   minute?: number | null;
 };
 
-
-const statusLabel: Record<MatchStatus, string> = {
-  scheduled: "טרם החל",
-  live: "משחק חי",
-  finished: "הסתיים",
-  postponed: "נדחה",
-};
+const statusLabel = DISPLAY_STATUS_LABEL_HE;
 
 const statusClass: Record<MatchStatus, string> = {
   scheduled: "bg-surface-2 text-muted-foreground",
   live: "bg-status-loss/15 text-status-loss",
   finished: "bg-status-draw/20 text-muted-foreground",
   postponed: "bg-status-draw/25 text-status-draw",
+  pending: "bg-surface-2 text-muted-foreground",
 };
 
 export function MatchCard({ match }: { match: MatchCardData }) {

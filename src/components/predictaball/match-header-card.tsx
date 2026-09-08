@@ -2,6 +2,7 @@ import { CalendarDays, Clock, MapPin } from "lucide-react";
 import { LogoSlot, LtrNum, SkeletonBlock } from "./ui-bits";
 import { VenueText } from "./venue-text";
 import type { MatchHeader } from "@/lib/match-details-read.server";
+import { deriveDisplayStatus } from "@/lib/match-display-status";
 
 function formatDate(iso: string | null) {
   if (!iso) return null;
@@ -49,9 +50,11 @@ export function MatchHeaderCard({
     );
   }
 
-  const isPostponed = header.status === "postponed";
+  const display = deriveDisplayStatus(header.status, header.kickoffAt);
+  const isPostponed = display === "postponed";
+  const isPending = display === "pending";
   const hasScore =
-    header.isFinished && header.homeScore !== null && header.awayScore !== null;
+    (header.isFinished || isPending) && header.homeScore !== null && header.awayScore !== null;
   const date = isPostponed ? null : formatDate(header.kickoffAt);
   const time = isPostponed ? null : formatTime(header.kickoffAt);
 
@@ -62,14 +65,9 @@ export function MatchHeaderCard({
 
         <div className="flex w-20 shrink-0 flex-col items-center gap-1 pt-3">
           {hasScore ? (
-            <>
-              <LtrNum className="text-2xl font-bold">
-                {header.awayScore} - {header.homeScore}
-              </LtrNum>
-              <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-muted-foreground">
-                הסתיים
-              </span>
-            </>
+            <LtrNum className="text-2xl font-bold">
+              {header.awayScore} - {header.homeScore}
+            </LtrNum>
           ) : isPostponed ? (
             <span className="rounded-full bg-status-draw/25 px-2 py-0.5 text-[11px] font-medium text-status-draw">
               נדחה
@@ -77,6 +75,15 @@ export function MatchHeaderCard({
           ) : (
             <span className="text-xl font-bold text-muted-foreground">VS</span>
           )}
+          {header.isFinished && hasScore ? (
+            <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-muted-foreground">
+              הסתיים
+            </span>
+          ) : isPending ? (
+            <span className="rounded-full bg-surface-2 px-2 py-0.5 text-center text-[11px] text-muted-foreground">
+              ממתין לעדכון
+            </span>
+          ) : null}
         </div>
 
         <TeamSide name={header.awayName} logo={header.awayLogo} />
