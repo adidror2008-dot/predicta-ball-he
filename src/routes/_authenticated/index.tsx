@@ -193,6 +193,7 @@ function MatchesPanel({
         const list = sections[section];
         if (list.length === 0) return null;
         const title = SECTION_TITLE_HE[section];
+        const note = SECTION_NOTE_HE[section];
         return (
           <div key={section} className="space-y-3" data-section={section}>
             {title ? (
@@ -201,6 +202,9 @@ function MatchesPanel({
                 <span className="text-xs font-medium text-muted-foreground">{title}</span>
                 <span className="h-px flex-1 bg-border" aria-hidden />
               </div>
+            ) : null}
+            {note ? (
+              <p className="text-center text-[11px] leading-tight text-muted-foreground">{note}</p>
             ) : null}
             {list.map((m) => (
               <MatchCard key={m.id} match={m} />
