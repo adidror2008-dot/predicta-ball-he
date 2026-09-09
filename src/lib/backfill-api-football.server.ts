@@ -50,9 +50,18 @@ export type BackfillResult = {
     score: string | null;
   }>;
   conflicts: string[];
+  unmatched: Array<{
+    match: string;
+    kickoff: string;
+    competition: string;
+    closest: string | null;
+    closest_score: number;
+    closest_kickoff: string | null;
+  }>;
   errors: string[];
   details_note: string;
 };
+
 
 const DROP_TOKENS = new Set([
   "fc", "sc", "sv", "ac", "as", "cf", "afc", "ssc", "vfb", "vfl", "bsc", "tsg",
@@ -341,8 +350,27 @@ export async function runBackfillApiFootball(options: {
       const label = `${teamLabel.get(m.home_team_id ?? "") ?? "?"} - ${teamLabel.get(m.away_team_id ?? "") ?? "?"}`;
       if (!best || best.score < 0.99) {
         result.not_found += 1;
+        // Diagnostic only: closest provider fixture anywhere that day, no time window.
+        let diag: { name: string; score: number; when: string } | null = null;
+        for (const fx of fixtures) {
+          const hName = String(fx["teams"]?.["home"]?.["name"] ?? "");
+          const aName = String(fx["teams"]?.["away"]?.["name"] ?? "");
+          const s = Math.min(bestScore(m.home_team_id, hName), bestScore(m.away_team_id, aName));
+          if (s > (diag?.score ?? 0)) {
+            diag = { name: `${hName} - ${aName}`, score: Number(s.toFixed(2)), when: String(fx["fixture"]?.["date"] ?? "") };
+          }
+        }
+        result.unmatched.push({
+          match: label,
+          kickoff: String(m.kickoff_at),
+          competition: compName.get(m.competition_id ?? "") ?? "ללא תחרות",
+          closest: diag?.name ?? null,
+          closest_score: diag?.score ?? 0,
+          closest_kickoff: diag?.when ?? null,
+        });
         continue;
       }
+
       if (second >= 0.99 || reversedBetter) {
         result.ambiguous_flagged += 1;
         result.conflicts.push(`${label} @ ${String(m.kickoff_at).slice(0, 16)} — ambiguous/reversed candidate`);
