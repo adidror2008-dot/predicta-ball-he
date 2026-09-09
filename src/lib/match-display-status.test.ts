@@ -97,7 +97,14 @@ describe("groupMatches — list sections", () => {
   it("uses the same mapping for the badge and the section, in a fixed order", () => {
     expect(sectionFor("pending")).toBe("pending");
     expect(sectionFor("scheduled")).toBe("upcoming");
-    expect(SECTION_ORDER).toEqual(["finished", "pending", "live", "upcoming", "postponed"]);
+    expect(SECTION_ORDER).toEqual([
+      "finished",
+      "pending",
+      "live",
+      "upcoming",
+      "unscheduled",
+      "postponed",
+    ]);
   });
 });
 
