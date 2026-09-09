@@ -82,7 +82,15 @@ export function MatchHeaderCard({
           ) : (
             <span className="text-xl font-bold text-muted-foreground">VS</span>
           )}
-          {header.isFinished && hasScore ? (
+          {isLive ? (
+            <span className="rounded-full bg-status-win/25 px-2 py-0.5 text-center text-[11px] font-medium text-status-win">
+              {header.minute !== null ? (
+                <LtrNum>{header.minute}'</LtrNum>
+              ) : (
+                DISPLAY_STATUS_LABEL_HE.live
+              )}
+            </span>
+          ) : header.isFinished && hasScore ? (
             <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-muted-foreground">
               {DISPLAY_STATUS_LABEL_HE.finished}
             </span>
