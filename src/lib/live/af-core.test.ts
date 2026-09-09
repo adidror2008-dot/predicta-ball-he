@@ -4,7 +4,10 @@ import {
   bestNameScore,
   buildAfUpdate,
   mapAfStatus,
+  isQuotaError,
+  nextCheckDelayMs,
   normalizeName,
+  providerErrorText,
   resolveUniqueFixture,
   type AfFixture,
 } from "./af-core";
@@ -141,5 +144,46 @@ describe("strict mapping", () => {
   it("does not confuse similar but different clubs", () => {
     expect(bestNameScore([normalizeName("Wolfsburg")], "Augsburg")).toBeLessThan(0.9);
     expect(bestNameScore([normalizeName("Athletico Paranaense")], "Atletico Mineiro")).toBeLessThan(0.9);
+  });
+});
+
+describe("token subsets are not identities", () => {
+  it("rejects a bare 'United' against any United club", () => {
+    expect(bestNameScore([normalizeName("United")], "Manchester United")).toBeLessThan(0.9);
+    expect(bestNameScore([normalizeName("United")], "Newcastle United")).toBeLessThan(0.9);
+  });
+  it("still accepts the same club written identically", () => {
+    expect(bestNameScore([normalizeName("Manchester United")], "Manchester Utd")).toBeGreaterThan(0);
+    expect(bestNameScore([normalizeName("Manchester United")], "Manchester United")).toBe(1);
+  });
+});
+
+describe("providerErrorText", () => {
+  it("treats an errors object as a failure, not a success", () => {
+    expect(providerErrorText({ errors: { requests: "quota reached" } })).toContain("quota");
+    expect(providerErrorText({ errors: [] })).toBeNull();
+    expect(providerErrorText({ response: [] })).toBeNull();
+  });
+  it("detects quota failures", () => {
+    expect(isQuotaError("requests: You have reached your quota", null)).toBe(true);
+    expect(isQuotaError(null, 429)).toBe(true);
+    expect(isQuotaError("bad league id", 200)).toBe(false);
+  });
+});
+
+describe("nextCheckDelayMs", () => {
+  const now = Date.parse("2026-09-10T12:00:00Z");
+  it("polls a live fixture again in two minutes", () => {
+    expect(nextCheckDelayMs("1H", null, now)).toBe(2 * 60_000);
+  });
+  it("does not re-probe a fixture the provider says starts in a month", () => {
+    const d = nextCheckDelayMs("NS", "2026-10-20T19:00:00Z", now);
+    expect(d).toBeGreaterThan(20 * 24 * 60 * 60_000);
+  });
+  it("re-checks an overdue not-started fixture within the hour", () => {
+    expect(nextCheckDelayMs("NS", "2026-09-10T09:00:00Z", now)).toBe(30 * 60_000);
+  });
+  it("backs off far for a final fixture", () => {
+    expect(nextCheckDelayMs("FT", null, now)).toBe(24 * 60 * 60_000);
   });
 });

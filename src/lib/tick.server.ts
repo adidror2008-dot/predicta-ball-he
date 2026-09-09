@@ -87,6 +87,10 @@ function liveMinute(ev: Record<string, any>): number | null {
   return max != null ? Math.min(minute, max) : minute;
 }
 
+const TICK_LEASE_KEY = "tick_lease";
+/** Longer than one tick, short enough that a crashed run recovers quickly. */
+const TICK_LEASE_SECONDS = 110;
+
 export async function runTick(): Promise<TickResult> {
   const startedAt = new Date().toISOString();
   const apiKey = process.env["SPORTAPI_API_KEY"];
@@ -109,7 +113,9 @@ export async function runTick(): Promise<TickResult> {
       started_at: startedAt,
       finished_at: new Date().toISOString(),
       status,
-      result_metric: notificationsSent,
+      // Real work done: rows actually written + notifications actually sent.
+      result_metric:
+        liveUpdated + matchesSettled + needsReviewFlagged + lineupsPrefetched + notificationsSent,
       result_detail: detail as never,
       error: error ?? null,
     });
@@ -137,6 +143,32 @@ export async function runTick(): Promise<TickResult> {
   const now = Date.now();
   const windowStart = new Date(now - ACTIVE_WINDOW_BEFORE_MS).toISOString();
   const windowEnd = new Date(now + ACTIVE_WINDOW_AFTER_MS).toISOString();
+
+  // Single-flight: cron and a manual run must never do the same provider work
+  // at the same time, or overwrite each other with a stale result.
+  const { data: leaseOk } = await supabaseAdmin.rpc("pb_try_lease", {
+    p_key: TICK_LEASE_KEY,
+    p_ttl_seconds: TICK_LEASE_SECONDS,
+  });
+  if (leaseOk !== true) {
+    return {
+      status: "success",
+      api_calls_made: 0,
+      active_matches: 0,
+      live_matches_updated: 0,
+      stale_matches: 0,
+      competitions_settled: 0,
+      matches_settled: 0,
+      needs_review_flagged: 0,
+      lineups_prefetched: 0,
+      finals_fetched: 0,
+      notifications_sent: 0,
+      reason: "another tick is already running",
+    };
+  }
+  const releaseLease = async () => {
+    await supabaseAdmin.rpc("pb_release_lease", { p_key: TICK_LEASE_KEY });
+  };
 
   // ---- STEP 1: pure database
   const { data: activeMatches, error: activeError } = await supabaseAdmin
@@ -178,6 +210,7 @@ export async function runTick(): Promise<TickResult> {
   });
 
   if (activeError) {
+    await releaseLease();
     await finish("failed", { api_calls: apiCalls }, activeError.message);
     return baseResult("failed", 0, activeError.message);
   }
@@ -251,17 +284,29 @@ export async function runTick(): Promise<TickResult> {
   // is only used for score/status when API-Football is unavailable, and keeps
   // owning identity, lineups, statistics and events.
   const seenLive = new Set<string>();
+  /** Matches API-Football has authoritative state for — Sofascore must not re-decide them. */
+  const afHandledIds = new Set<string>();
   let budgetBlocked = false;
   let afDetail: Record<string, any> | null = null;
   let afUsable = false;
+  let afCalls = 0;
+  let afWrites = 0;
 
   try {
     const { runAfLive } = await import("@/lib/live-api-football.server");
     const af = await runAfLive();
-    afUsable = af.key_present && af.provider_error === null && !af.budget_blocked;
+    // Core live health only. Optional background work (mapping discovery) that
+    // ran out of 'bulk' budget must NOT push the tick onto the fallback.
+    afUsable = af.key_present && af.live_ok;
+    afCalls = af.calls_used;
+    apiCalls += af.calls_used;
+    for (const ext of af.handled_external_ids) seenLive.add(ext);
+    for (const id of af.handled_match_ids) afHandledIds.add(id);
     for (const { row, update } of af.applied) {
       liveUpdated += 1;
+      afWrites += 1;
       if (row.external_id) seenLive.add(String(row.external_id));
+      afHandledIds.add(row.id);
       const snap = snapshots.get(row.id) ?? {
         match_id: row.id,
         external_id: String(row.external_id ?? ""),
@@ -280,10 +325,11 @@ export async function runTick(): Promise<TickResult> {
     }
     const { applied: _applied, ...summary } = af;
     afDetail = summary;
-    if (af.budget_blocked) budgetBlocked = true;
+    if (af.live_budget_blocked) budgetBlocked = true;
   } catch (e) {
     afDetail = { error: e instanceof Error ? e.message : "api-football live failed" };
   }
+
 
   if (!afUsable && !quiet && apiKey) {
     // Fallback only — the primary provider could not be used this tick.
@@ -330,6 +376,8 @@ export async function runTick(): Promise<TickResult> {
   const stale = active.filter(
     (m) =>
       !seenLive.has(String(m.external_id)) &&
+      // API-Football already has authoritative state for this row this tick.
+      !afHandledIds.has(m.id) &&
       m.kickoff_at != null &&
       now - new Date(m.kickoff_at).getTime() > STALE_AFTER_MS,
   );
@@ -416,6 +464,7 @@ export async function runTick(): Promise<TickResult> {
         .filter(
           (m) =>
             !seenLive.has(String(m.external_id)) &&
+            !afHandledIds.has(m.id) &&
             m.live_source === SOURCE &&
             !FINAL_STATUS_TYPES.includes(String(m.status)),
         )
@@ -477,10 +526,17 @@ export async function runTick(): Promise<TickResult> {
     budget_blocked: budgetBlocked,
     catch_up: catchUp,
   };
-  const status = budgetBlocked ? "partial" : "success";
-  await finish(status, detail);
+  const liveCoreFailed = afDetail?.["key_present"] === true && afDetail?.["live_ok"] === false;
+  const reason = liveCoreFailed
+    ? `api_football_live_unavailable: ${afDetail?.["provider_error"] ?? "unknown"}`
+    : budgetBlocked
+      ? "budget_blocked"
+      : undefined;
+  const status = liveCoreFailed || budgetBlocked ? "partial" : "success";
+  await finish(status, { ...detail, af_calls: afCalls, af_writes: afWrites }, reason);
+  await releaseLease();
 
-  return baseResult(status, active.length, budgetBlocked ? "budget_blocked" : undefined);
+  return baseResult(status, active.length, reason);
 }
 
 

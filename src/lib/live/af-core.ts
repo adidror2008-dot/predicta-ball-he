@@ -175,14 +175,21 @@ export function normalizeName(raw: string): string[] {
     .filter((t) => t.length > 0 && !DROP_TOKENS.has(t) && !/^\d+$/.test(t));
 }
 
+/**
+ * Overlap over the LARGER token set, never the smaller one. Dividing by the
+ * smaller set makes any subset a perfect match ("United" == "Manchester
+ * United" == "Newcastle United"), which is exactly the unsafe behaviour this
+ * pipeline must not have.
+ */
 function tokenSimilarity(a: string[], b: string[]): number {
   if (a.length === 0 || b.length === 0) return 0;
   const sa = new Set(a);
   const sb = new Set(b);
   let inter = 0;
   for (const t of sa) if (sb.has(t)) inter += 1;
-  return inter === 0 ? 0 : inter / Math.min(sa.size, sb.size);
+  return inter === 0 ? 0 : inter / Math.max(sa.size, sb.size);
 }
+
 
 function diceSimilarity(a: string, b: string): number {
   if (a.length < 2 || b.length < 2) return a === b ? 1 : 0;
@@ -242,4 +249,54 @@ export function resolveUniqueFixture(
     }
   }
   return hits.length === 1 ? hits[0]! : null;
+}
+
+// ------------------------------------------------------- reconciliation pacing
+
+/**
+ * How long to wait before reading a mapped fixture again. Keeps the sweep
+ * bounded and fair: a fixture the provider says has not started yet is not
+ * probed again until shortly before its provider kickoff, so far-future rows
+ * (e.g. league-phase fixtures stored with a placeholder kickoff) never starve
+ * the rows that are actually due.
+ */
+export function nextCheckDelayMs(
+  short: string | null,
+  providerKickoffIso: string | null,
+  nowMs: number,
+): number {
+  const mapped = short ? mapAfStatus(short) : null;
+  if (mapped?.live) return 2 * 60_000;
+  if (mapped?.final) return 24 * 60 * 60_000;
+  if (mapped?.status === "notstarted") {
+    const ts = providerKickoffIso ? Date.parse(providerKickoffIso) : NaN;
+    if (Number.isFinite(ts) && ts > nowMs) {
+      // wake up 5 minutes before the provider kickoff, never sooner than 30 min
+      return Math.max(ts - nowMs - 5 * 60_000, 30 * 60_000);
+    }
+    return 30 * 60_000;
+  }
+  return 60 * 60_000;
+}
+
+/** Provider payloads that carry an error object/array are NOT successes. */
+export function providerErrorText(json: unknown): string | null {
+  if (!json || typeof json !== "object") return null;
+  const errors = (json as Record<string, unknown>)["errors"];
+  if (!errors) return null;
+  if (Array.isArray(errors)) return errors.length > 0 ? String(errors[0]).slice(0, 200) : null;
+  if (typeof errors === "object") {
+    const entries = Object.entries(errors as Record<string, unknown>);
+    if (entries.length === 0) return null;
+    return entries.map(([k, v]) => `${k}: ${String(v)}`).join("; ").slice(0, 200);
+  }
+  const s = String(errors).trim();
+  return s.length > 0 ? s.slice(0, 200) : null;
+}
+
+/** True when the provider error/status means "stop calling for a while". */
+export function isQuotaError(text: string | null, httpStatus: number | null): boolean {
+  if (httpStatus === 429) return true;
+  if (!text) return false;
+  return /quota|rate ?limit|too many requests|exceeded/i.test(text);
 }
