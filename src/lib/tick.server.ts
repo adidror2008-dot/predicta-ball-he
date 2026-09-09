@@ -285,7 +285,7 @@ export async function runTick(): Promise<TickResult> {
     afDetail = { error: e instanceof Error ? e.message : "api-football live failed" };
   }
 
-  if (!afUsable) {
+  if (!afUsable && !quiet && apiKey) {
     // Fallback only — the primary provider could not be used this tick.
     if (await takeBudget()) {
       const res = await call(`/api/v1/sport/football/events/live`);
