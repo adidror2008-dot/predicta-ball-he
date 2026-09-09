@@ -1,0 +1,1 @@
+revoke execute on function public.api_budget_status(text) from authenticated;
