@@ -206,37 +206,23 @@ export async function runTick(): Promise<TickResult> {
     if ((count ?? 0) === 0) lineupCandidates.push(m);
   }
 
-  if (active.length === 0 && lineupCandidates.length === 0) {
-    // Quiet tick — the ideal moment for the bounded catch-up of old unresolved matches.
-    let catchUp: Awaited<ReturnType<typeof maybeRunCatchUp>> = null;
-    if (apiKey) {
-      try {
-        catchUp = await maybeRunCatchUp();
-      } catch (e) {
-        catchUp = { skipped: e instanceof Error ? e.message : "catch-up failed" };
-      }
-    }
-    await finish("success", { reason: "nothing_active", api_calls: 0, catch_up: catchUp });
-    return baseResult("success", 0, "nothing_active");
-  }
-
-  if (!apiKey) {
-    await finish(
-      "failed",
-      { active_matches: active.length, api_calls: 0 },
-      "SPORTAPI_API_KEY missing",
-    );
-    return baseResult("failed", active.length, "SPORTAPI_API_KEY missing");
-  }
+  // A quiet tick by *stored kickoff* is not proof that nothing is being
+  // played: stored kickoffs can be stale or unverified. The API-Football live
+  // sweep below is keyed on the verified fixture mapping, not on kickoff_at,
+  // so it still runs. Only the Sofascore-side work is skipped.
+  const quiet = active.length === 0 && lineupCandidates.length === 0;
 
   // The lineups fetcher owns its own budget gate ('lineups' category) and job_runs row.
-  for (const candidate of lineupCandidates) {
-    const { runFetchMatchLineups } = await import("@/lib/fetch-match-lineups.server");
-    const r = await runFetchMatchLineups({ matchExternalId: String(candidate.external_id) });
-    if (r.budget_exhausted) break;
-    apiCalls += r.http_status != null ? 1 : 0;
-    if (r.lineups_upserted > 0) lineupsPrefetched += 1;
+  if (apiKey) {
+    for (const candidate of lineupCandidates) {
+      const { runFetchMatchLineups } = await import("@/lib/fetch-match-lineups.server");
+      const r = await runFetchMatchLineups({ matchExternalId: String(candidate.external_id) });
+      if (r.budget_exhausted) break;
+      apiCalls += r.http_status != null ? 1 : 0;
+      if (r.lineups_upserted > 0) lineupsPrefetched += 1;
+    }
   }
+
 
   const byExternalId = new Map(active.map((m) => [String(m.external_id), m]));
 
