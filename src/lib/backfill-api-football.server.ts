@@ -157,6 +157,8 @@ export async function runBackfillApiFootball(options: {
     by_competition: {},
     changes: [],
     conflicts: [],
+    unmatched: [],
+
     errors: [],
     details_note:
       "Project rule: API-Football may only update status/score on existing matches. Lineups, events and statistics stay Sofascore-owned and were not fetched.",
