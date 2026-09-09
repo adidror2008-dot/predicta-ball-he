@@ -33,15 +33,15 @@ const statusClass: Record<MatchStatus, string> = {
   finished: "bg-status-draw/20 text-muted-foreground",
   postponed: "bg-status-draw/25 text-status-draw",
   pending: "bg-surface-2 text-muted-foreground",
-  unscheduled: "bg-surface-2 text-muted-foreground",
+  unverified: "bg-surface-2 text-muted-foreground",
 };
 
 export function MatchCard({ match }: { match: MatchCardData }) {
   const isPostponed = match.status === "postponed";
-  const isUnscheduled = match.status === "unscheduled";
+  const isUnverified = match.status === "unverified";
   const isPendingUpdate = match.status === "pending";
   const hasScore =
-    !isPostponed && !isUnscheduled && match.homeScore !== null && match.awayScore !== null;
+    !isPostponed && match.homeScore !== null && match.awayScore !== null;
   const isFuture = match.status === "scheduled";
   const isFinished = match.status === "finished";
 
@@ -66,7 +66,7 @@ export function MatchCard({ match }: { match: MatchCardData }) {
           {statusLabel[match.status]}
         </span>
         <div className="flex items-center gap-2">
-          {!isFuture && !isPostponed && !isUnscheduled && match.date ? (
+          {!isFuture && !isPostponed && !isUnverified && match.date ? (
             <LtrNum className="text-[11px] text-muted-foreground">{match.date}</LtrNum>
           ) : null}
         </div>
@@ -79,14 +79,10 @@ export function MatchCard({ match }: { match: MatchCardData }) {
           <span className="min-w-0 flex-1 truncate whitespace-nowrap text-start text-sm font-medium">{match.homeName}</span>
         </div>
 
-        <div className={cn("shrink-0 text-center", isPostponed || isPendingUpdate || isUnscheduled ? "w-24" : "w-14")}>
+        <div className={cn("shrink-0 text-center", isPostponed || isPendingUpdate || isUnverified ? "w-24" : "w-14")}>
           {isPostponed ? (
             <span className="block text-[11px] leading-tight text-muted-foreground">
               מועד חדש טרם נקבע
-            </span>
-          ) : isUnscheduled ? (
-            <span className="block text-[11px] leading-tight text-muted-foreground">
-              מועד המשחק טרם נקבע
             </span>
           ) : hasScore ? (
             <div className="flex flex-col items-center gap-0.5">
@@ -95,16 +91,16 @@ export function MatchCard({ match }: { match: MatchCardData }) {
                   {match.minute}׳
                 </LtrNum>
               ) : null}
-              <LtrNum className={cn("text-lg font-bold", isPendingUpdate && "text-muted-foreground")}>
+              <LtrNum className={cn("text-lg font-bold", (isPendingUpdate || isUnverified) && "text-muted-foreground")}>
                 {match.awayScore} - {match.homeScore}
               </LtrNum>
-              {isPendingUpdate ? (
+              {isPendingUpdate || isUnverified ? (
                 <span className="text-[10px] leading-tight text-muted-foreground">
                   {PENDING_SCORE_LABEL_HE}
                 </span>
               ) : null}
             </div>
-          ) : isPendingUpdate ? (
+          ) : isPendingUpdate || isUnverified ? (
             <span className="text-sm text-muted-foreground">—</span>
           ) : isFuture && match.date ? (
             <div className="flex flex-col items-center gap-0.5">

@@ -102,35 +102,40 @@ describe("groupMatches — list sections", () => {
       "pending",
       "live",
       "upcoming",
-      "unscheduled",
+      "unverified",
       "postponed",
     ]);
   });
 });
 
-describe("unconfirmed kickoff placeholders", () => {
+describe("unverified kickoff times", () => {
   const longAgo = "2026-09-08T19:00:00Z";
   const now = Date.parse("2026-09-09T12:00:00Z");
 
-  it("never marks an unconfirmed-date fixture as pending", () => {
-    expect(deriveDisplayStatus("notstarted", longAgo, now, false)).toBe("unscheduled");
+  it("marks a stale non-final row with an unverified date as unverified", () => {
+    expect(deriveDisplayStatus("notstarted", longAgo, now, false)).toBe("unverified");
   });
 
-  it("still marks a confirmed-date fixture as pending", () => {
+  it("keeps a verified-date stale row as pending", () => {
     expect(deriveDisplayStatus("notstarted", longAgo, now, true)).toBe("pending");
   });
 
-  it("groups unconfirmed fixtures away from upcoming and pending", () => {
+  it("does not downgrade a recent live match with an unverified date", () => {
+    const recent = new Date(now - 30 * 60 * 1000).toISOString();
+    expect(deriveDisplayStatus("inprogress", recent, now, false)).toBe("live");
+  });
+
+  it("groups unverified-date rows into their own section", () => {
     const g = groupMatches(
       [{ status: "notstarted", kickoffAt: longAgo, timeConfirmed: false }],
       now,
     );
-    expect(g.unscheduled).toHaveLength(1);
+    expect(g.unverified).toHaveLength(1);
     expect(g.upcoming).toHaveLength(0);
     expect(g.pending).toHaveLength(0);
   });
 
-  it("does not invent a result for an unconfirmed fixture", () => {
+  it("never claims a finished result from an unverified date", () => {
     expect(deriveDisplayStatus("notstarted", longAgo, now, false)).not.toBe("finished");
   });
 });

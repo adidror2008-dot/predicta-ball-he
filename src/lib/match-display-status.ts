@@ -16,7 +16,7 @@ export type MatchDisplayStatus =
   | "finished"
   | "postponed"
   | "pending"
-  | "unscheduled";
+  | "unverified";
 
 export const STALE_AFTER_MS = 4 * 60 * 60 * 1000;
 
@@ -26,7 +26,7 @@ const POSTPONED = new Set(["postponed", "canceled", "cancelled", "removed"]);
 
 export function rawToDisplayStatus(
   status: string | null | undefined,
-): Exclude<MatchDisplayStatus, "pending" | "unscheduled"> {
+): Exclude<MatchDisplayStatus, "pending" | "unverified"> {
   if (status && POSTPONED.has(status)) return "postponed";
   if (status && FINISHED.has(status)) return "finished";
   if (status && LIVE.has(status)) return "live";
@@ -37,9 +37,12 @@ export function rawToDisplayStatus(
  * `pending` when the raw status is non-final and kickoff is >= 4h in the past.
  * Final statuses (finished / postponed) are never downgraded.
  *
- * A non-final match whose kickoff time is explicitly unconfirmed carries a
- * placeholder date from the source, so an elapsed placeholder proves nothing:
- * it is `unscheduled`, never "pending" or "live", and never a result.
+ * `time_confirmed = false` means only that the stored kickoff time was never
+ * verified. It does NOT prove the match is in the future, was not played, or
+ * has no date — many genuinely completed matches carry that flag. Such a
+ * stale, non-final row is therefore `unverified`: the date is presented as
+ * unverified and no final result is claimed, while any score already stored
+ * is still shown as the last one received.
  */
 export function deriveDisplayStatus(
   status: string | null | undefined,
@@ -53,7 +56,7 @@ export function deriveDisplayStatus(
   const kickoff = Date.parse(kickoffAt);
   if (!Number.isFinite(kickoff)) return base;
   if (nowMs - kickoff < STALE_AFTER_MS) return base;
-  return timeConfirmed ? "pending" : "unscheduled";
+  return timeConfirmed ? "pending" : "unverified";
 }
 
 
@@ -63,30 +66,35 @@ export const DISPLAY_STATUS_LABEL_HE: Record<MatchDisplayStatus, string> = {
   finished: "הסתיים",
   postponed: "נדחה",
   pending: "ממתין לעדכון",
-  unscheduled: "מועד טרם נקבע",
+  unverified: "מועד לא מאומת",
 };
 
 /** Caption for a score that is the last one received, not a verified final. */
 export const PENDING_SCORE_LABEL_HE = "תוצאה אחרונה שנקלטה";
 
 /** List sections, in display order. */
-export type MatchSection = "finished" | "pending" | "live" | "upcoming" | "unscheduled" | "postponed";
+export type MatchSection = "finished" | "pending" | "live" | "upcoming" | "unverified" | "postponed";
 
 export const SECTION_ORDER: readonly MatchSection[] = [
   "finished",
   "pending",
   "live",
   "upcoming",
-  "unscheduled",
+  "unverified",
   "postponed",
 ];
+
+/** Neutral note shown under a section title, when the section needs one. */
+export const SECTION_NOTE_HE: Partial<Record<MatchSection, string>> = {
+  unverified: "המועד השמור לא אומת; אין עדיין תוצאה סופית מאומתת.",
+};
 
 export const SECTION_TITLE_HE: Record<MatchSection, string | null> = {
   finished: null,
   pending: "משחקי עבר — ממתינים לעדכון",
   live: "משחקים חיים",
   upcoming: "משחקים קרובים",
-  unscheduled: "משחקים שמועדם טרם נקבע",
+  unverified: "משחקים שמועדם דורש אימות",
   postponed: "משחקים שנדחו",
 };
 
@@ -100,8 +108,8 @@ export function sectionFor(display: MatchDisplayStatus): MatchSection {
       return "live";
     case "postponed":
       return "postponed";
-    case "unscheduled":
-      return "unscheduled";
+    case "unverified":
+      return "unverified";
     default:
       return "upcoming";
   }
@@ -122,7 +130,7 @@ export function groupMatches<
     pending: [],
     live: [],
     upcoming: [],
-    unscheduled: [],
+    unverified: [],
     postponed: [],
   };
   const sorted = [...matches].sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt));
