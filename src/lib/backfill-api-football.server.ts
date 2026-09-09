@@ -379,7 +379,7 @@ export async function runBackfillApiFootball(options: {
         best != null &&
         (best.score >= 0.99 ||
           (best.score >= 0.6 && best.delta <= 20 * 60_000 && second <= best.score - 0.15));
-      if (!accepted) {
+      if (!accepted || !best) {
         result.not_found += 1;
 
         // Diagnostic only: closest provider fixture anywhere that day, no time window.
