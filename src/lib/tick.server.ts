@@ -464,6 +464,8 @@ export async function runTick(): Promise<TickResult> {
     notifications: notificationDetail,
     notifications_sent: notificationsSent,
     api_calls_made: apiCalls,
+    api_football: afDetail,
+    quiet_by_stored_kickoff: quiet,
     active_matches: active.length,
     live_matches_updated: liveUpdated,
     stale_matches: staleCount,
@@ -480,4 +482,5 @@ export async function runTick(): Promise<TickResult> {
 
   return baseResult(status, active.length, budgetBlocked ? "budget_blocked" : undefined);
 }
+
 
