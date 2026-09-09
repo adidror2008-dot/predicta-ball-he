@@ -19,6 +19,7 @@ export type MatchHeader = {
   awayLogo: string | null;
   homeScore: number | null;
   awayScore: number | null;
+  minute: number | null;
 };
 
 export type PredictionFactor = {
