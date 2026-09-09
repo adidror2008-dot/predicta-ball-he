@@ -42,7 +42,7 @@ function MatchPage() {
 
   // Stats/events exist for any match that has actually kicked off — live and
   // awaiting-update matches included, not only settled ones.
-  const display = header ? deriveDisplayStatus(header.status, header.kickoffAt) : null;
+  const display = header ? deriveDisplayStatus(header.status, header.kickoffAt, Date.now(), header.timeConfirmed) : null;
   const hasMatchData = display === "finished" || display === "live" || display === "pending";
 
   return (

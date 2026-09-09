@@ -19,7 +19,6 @@ import { Route as AuthenticatedNewsRouteImport } from './routes/_authenticated/n
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedMatchIdRouteImport } from './routes/_authenticated/match.$id'
 import { Route as ApiCronRefreshRouteImport } from './routes/api/cron/refresh'
-import { Route as ApiPublicBackfillApiFootballRouteImport } from './routes/api/public/backfill-api-football'
 import { Route as ApiPublicBacktestSweepRouteImport } from './routes/api/public/backtest-sweep'
 import { Route as ApiPublicBacktestV7RouteImport } from './routes/api/public/backtest-v7'
 import { Route as ApiPublicCatchUpMatchesRouteImport } from './routes/api/public/catch-up-matches'
@@ -88,12 +87,6 @@ const ApiCronRefreshRoute = ApiCronRefreshRouteImport.update({
   path: '/api/cron/refresh',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicBackfillApiFootballRoute =
-  ApiPublicBackfillApiFootballRouteImport.update({
-    id: '/api/public/backfill-api-football',
-    path: '/api/public/backfill-api-football',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ApiPublicBacktestSweepRoute = ApiPublicBacktestSweepRouteImport.update({
   id: '/api/public/backtest-sweep',
   path: '/api/public/backtest-sweep',
@@ -206,7 +199,6 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/match/$id': typeof AuthenticatedMatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
-  '/api/public/backfill-api-football': typeof ApiPublicBackfillApiFootballRoute
   '/api/public/backtest-sweep': typeof ApiPublicBacktestSweepRoute
   '/api/public/backtest-v7': typeof ApiPublicBacktestV7Route
   '/api/public/catch-up-matches': typeof ApiPublicCatchUpMatchesRoute
@@ -236,7 +228,6 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/match/$id': typeof AuthenticatedMatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
-  '/api/public/backfill-api-football': typeof ApiPublicBackfillApiFootballRoute
   '/api/public/backtest-sweep': typeof ApiPublicBacktestSweepRoute
   '/api/public/backtest-v7': typeof ApiPublicBacktestV7Route
   '/api/public/catch-up-matches': typeof ApiPublicCatchUpMatchesRoute
@@ -268,7 +259,6 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/match/$id': typeof AuthenticatedMatchIdRoute
   '/api/cron/refresh': typeof ApiCronRefreshRoute
-  '/api/public/backfill-api-football': typeof ApiPublicBackfillApiFootballRoute
   '/api/public/backtest-sweep': typeof ApiPublicBacktestSweepRoute
   '/api/public/backtest-v7': typeof ApiPublicBacktestV7Route
   '/api/public/catch-up-matches': typeof ApiPublicCatchUpMatchesRoute
@@ -300,7 +290,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/match/$id'
     | '/api/cron/refresh'
-    | '/api/public/backfill-api-football'
     | '/api/public/backtest-sweep'
     | '/api/public/backtest-v7'
     | '/api/public/catch-up-matches'
@@ -330,7 +319,6 @@ export interface FileRouteTypes {
     | '/'
     | '/match/$id'
     | '/api/cron/refresh'
-    | '/api/public/backfill-api-football'
     | '/api/public/backtest-sweep'
     | '/api/public/backtest-v7'
     | '/api/public/catch-up-matches'
@@ -361,7 +349,6 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/match/$id'
     | '/api/cron/refresh'
-    | '/api/public/backfill-api-football'
     | '/api/public/backtest-sweep'
     | '/api/public/backtest-v7'
     | '/api/public/catch-up-matches'
@@ -387,7 +374,6 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ApiCronRefreshRoute: typeof ApiCronRefreshRoute
-  ApiPublicBackfillApiFootballRoute: typeof ApiPublicBackfillApiFootballRoute
   ApiPublicBacktestSweepRoute: typeof ApiPublicBacktestSweepRoute
   ApiPublicBacktestV7Route: typeof ApiPublicBacktestV7Route
   ApiPublicCatchUpMatchesRoute: typeof ApiPublicCatchUpMatchesRoute
@@ -478,13 +464,6 @@ declare module '@tanstack/react-router' {
       path: '/api/cron/refresh'
       fullPath: '/api/cron/refresh'
       preLoaderRoute: typeof ApiCronRefreshRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/backfill-api-football': {
-      id: '/api/public/backfill-api-football'
-      path: '/api/public/backfill-api-football'
-      fullPath: '/api/public/backfill-api-football'
-      preLoaderRoute: typeof ApiPublicBackfillApiFootballRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/backtest-sweep': {
@@ -642,7 +621,6 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ApiCronRefreshRoute: ApiCronRefreshRoute,
-  ApiPublicBackfillApiFootballRoute: ApiPublicBackfillApiFootballRoute,
   ApiPublicBacktestSweepRoute: ApiPublicBacktestSweepRoute,
   ApiPublicBacktestV7Route: ApiPublicBacktestV7Route,
   ApiPublicCatchUpMatchesRoute: ApiPublicCatchUpMatchesRoute,

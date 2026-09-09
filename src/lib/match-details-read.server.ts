@@ -12,6 +12,7 @@ export type MatchHeader = {
   status: string | null;
   isFinished: boolean;
   kickoffAt: string | null;
+  timeConfirmed: boolean;
   venue: string | null;
   homeName: string | null;
   awayName: string | null;
@@ -310,13 +311,14 @@ export async function getMatchHeader(matchRef: string): Promise<MatchHeader | nu
     supabaseAdmin
       .from("matches")
       .select(
-        "id, external_id, status, kickoff_at, venue, home_team_id, away_team_id, home_score, away_score, minute",
+        "id, external_id, status, kickoff_at, time_confirmed, venue, home_team_id, away_team_id, home_score, away_score, minute",
       );
 
   type MatchRow = {
     id: string;
     external_id: string | null;
     status: string | null;
+    time_confirmed?: boolean | null;
     kickoff_at: string | null;
     venue: string | null;
     home_team_id: string | null;
@@ -357,6 +359,7 @@ export async function getMatchHeader(matchRef: string): Promise<MatchHeader | nu
     status: row.status,
     isFinished: row.status === "finished",
     kickoffAt: row.kickoff_at,
+    timeConfirmed: row.time_confirmed !== false,
     venue: row.venue,
     homeName: home?.name_he || home?.name_en || null,
     awayName: away?.name_he || away?.name_en || null,

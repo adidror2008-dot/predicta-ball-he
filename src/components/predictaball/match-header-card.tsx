@@ -54,7 +54,13 @@ export function MatchHeaderCard({
     );
   }
 
-  const display = deriveDisplayStatus(header.status, header.kickoffAt);
+  const display = deriveDisplayStatus(
+    header.status,
+    header.kickoffAt,
+    Date.now(),
+    header.timeConfirmed,
+  );
+  const isUnscheduled = display === "unscheduled";
   const isPostponed = display === "postponed";
   const isAwaitingUpdate = display === "pending";
   const isLive = display === "live";
@@ -62,8 +68,8 @@ export function MatchHeaderCard({
     (header.isFinished || isAwaitingUpdate || isLive) &&
     header.homeScore !== null &&
     header.awayScore !== null;
-  const date = isPostponed ? null : formatDate(header.kickoffAt);
-  const time = isPostponed ? null : formatTime(header.kickoffAt);
+  const date = isPostponed || isUnscheduled ? null : formatDate(header.kickoffAt);
+  const time = isPostponed || isUnscheduled ? null : formatTime(header.kickoffAt);
 
   return (
     <section className="rounded-2xl bg-card p-4 shadow-card">
@@ -78,6 +84,10 @@ export function MatchHeaderCard({
           ) : isPostponed ? (
             <span className="rounded-full bg-status-draw/25 px-2 py-0.5 text-[11px] font-medium text-status-draw">
               נדחה
+            </span>
+          ) : isUnscheduled ? (
+            <span className="rounded-full bg-surface-2 px-2 py-0.5 text-center text-[11px] text-muted-foreground">
+              {DISPLAY_STATUS_LABEL_HE.unscheduled}
             </span>
           ) : (
             <span className="text-xl font-bold text-muted-foreground">VS</span>

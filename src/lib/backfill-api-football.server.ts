@@ -1,16 +1,27 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 /**
- * Manual, bounded backfill of overdue match results through API-Football.
+ * Verified, bounded backfill of overdue match results through API-Football.
  *
  * Iron rules honoured here:
- * - API-Football is a BACKUP source. It may only UPDATE status/score on
+ * - API-Football is a BACKUP source. It may only UPDATE status / score on
  *   matches that already exist (created by Sofascore, the identity owner).
- *   It never inserts teams, competitions or matches, and never touches
- *   external_id / source identity columns.
+ *   It never inserts teams, competitions or matches, never touches
+ *   external_id / source, and never rewrites kickoff_at.
  * - Every outgoing call passes api_budget_take(provider='api-football').
  * - Provider truth only: status is copied from the provider, never inferred
  *   from the fact that the kickoff time has passed.
+ *
+ * Matching is league-scoped, not free fuzzy text: one request per competition
+ * season returns the whole provider fixture list, and a DB row is only
+ * accepted when it resolves to exactly one provider fixture id in that
+ * league/season. Accepted evidence, per row:
+ *   - "both"   – both club names match >= 0.90 and no rival candidate does
+ *   - "anchor" – one side matches >= 0.90, the fixture is the only candidate
+ *                in the +-3h window, and the other side is not contradictory
+ *   - "pair"   – the club pair (both >= 0.90) occurs exactly once in the whole
+ *                season, used when the stored kickoff is off by days
+ * Anything else is left untouched and reported as unresolved evidence.
  */
 
 const HOST = "https://v3.football.api-sports.io";
@@ -18,6 +29,41 @@ const PROVIDER = "api-football";
 const LIVE_SOURCE = "api-football";
 
 type AnyRec = Record<string, any>;
+
+/** Sofascore tournament_id -> API-Football league id (verified via /leagues). */
+const LEAGUE_BY_TOURNAMENT: Record<string, number> = {
+  "7": 2, // UEFA Champions League
+  "679": 3, // UEFA Europa League
+  "17": 39, // Premier League
+  "8": 140, // LaLiga
+  "23": 135, // Serie A
+  "35": 78, // Bundesliga
+  "34": 61, // Ligue 1
+  "37": 88, // Eredivisie
+  "325": 71, // Brasileirão Série A
+  "266": 383, // Ligat Ha'al
+  "9355": 385, // Toto Cup Ligat Al
+};
+
+const MATCH_WINDOW_MS = 3 * 3600_000;
+const PAIR_WINDOW_MS = 10 * 24 * 3600_000;
+const STRONG = 0.9;
+const NOT_CONTRADICTORY = 0.25;
+
+export type BackfillEvidence = {
+  match_id: string;
+  match: string;
+  competition: string;
+  db_kickoff: string;
+  db_status: string;
+  matched_by: "both" | "anchor" | "pair" | null;
+  provider_fixture_id: number | null;
+  provider_kickoff: string | null;
+  provider_teams: string | null;
+  provider_status: string | null;
+  provider_score: string | null;
+  note?: string;
+};
 
 export type BackfillResult = {
   status: "success" | "partial" | "failed" | "skipped";
@@ -33,35 +79,19 @@ export type BackfillResult = {
   };
   calls_used: number;
   candidates: number;
-  dates_fetched: number;
+  leagues_fetched: number;
   matched: number;
   updated: number;
   unchanged: number;
-  ambiguous_flagged: number;
-  not_found: number;
   still_open_at_provider: number;
+  unresolved: number;
   by_competition: Record<string, { before: number; updated: number }>;
-  changes: Array<{
-    match: string;
-    kickoff: string;
-    competition: string;
-    from: string;
-    to: string;
-    score: string | null;
-  }>;
-  conflicts: string[];
-  unmatched: Array<{
-    match: string;
-    kickoff: string;
-    competition: string;
-    closest: string | null;
-    closest_score: number;
-    closest_kickoff: string | null;
-  }>;
+  changes: BackfillEvidence[];
+  remainder: BackfillEvidence[];
+  conflicts: BackfillEvidence[];
   errors: string[];
   details_note: string;
 };
-
 
 const DROP_TOKENS = new Set([
   "fc", "sc", "sv", "ac", "as", "cf", "afc", "ssc", "vfb", "vfl", "bsc", "tsg",
@@ -70,30 +100,26 @@ const DROP_TOKENS = new Set([
 ]);
 
 function normalizeName(raw: string): string[] {
-  const base = raw
+  return raw
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9 ]/g, " ")
     .replace(/\s+/g, " ")
-    .trim();
-  return base
+    .trim()
     .split(" ")
     .filter((t) => t.length > 0 && !DROP_TOKENS.has(t) && !/^\d+$/.test(t));
 }
 
-/** 1 = one token set fully contains the other, else overlap ratio. */
 function tokenSimilarity(a: string[], b: string[]): number {
   if (a.length === 0 || b.length === 0) return 0;
   const sa = new Set(a);
   const sb = new Set(b);
   let inter = 0;
   for (const t of sa) if (sb.has(t)) inter += 1;
-  if (inter === 0) return 0;
-  return inter / Math.min(sa.size, sb.size);
+  return inter === 0 ? 0 : inter / Math.min(sa.size, sb.size);
 }
 
-/** Dice bigram coefficient over the collapsed letter string — tolerates spelling variants. */
 function diceSimilarity(a: string, b: string): number {
   if (a.length < 2 || b.length < 2) return a === b ? 1 : 0;
   const grams = (s: string) => {
@@ -115,7 +141,6 @@ function similarity(a: string[], b: string[]): number {
   return Math.max(tokenSimilarity(a, b), diceSimilarity(a.join(""), b.join("")));
 }
 
-
 function mapStatus(short: string): { status: string; final: boolean; live: boolean } | null {
   switch (short) {
     case "FT":
@@ -125,7 +150,6 @@ function mapStatus(short: string): { status: string; final: boolean; live: boole
     case "PST":
       return { status: "postponed", final: true, live: false };
     case "CANC":
-      return { status: "canceled", final: true, live: false };
     case "ABD":
       return { status: "canceled", final: true, live: false };
     case "AWD":
@@ -139,6 +163,7 @@ function mapStatus(short: string): { status: string; final: boolean; live: boole
     case "P":
     case "LIVE":
     case "INT":
+    case "SUSP":
       return { status: "inprogress", final: false, live: true };
     case "NS":
     case "TBD":
@@ -146,6 +171,14 @@ function mapStatus(short: string): { status: string; final: boolean; live: boole
     default:
       return null;
   }
+}
+
+/** Provider season key: calendar competitions use the year, others the start year. */
+function seasonFor(kickoffIso: string, method: string | null): number {
+  const d = new Date(kickoffIso);
+  const y = d.getUTCFullYear();
+  if (method === "calendar") return y;
+  return d.getUTCMonth() + 1 >= 7 ? y : y - 1;
 }
 
 export async function runBackfillApiFootball(options: {
@@ -170,21 +203,19 @@ export async function runBackfillApiFootball(options: {
     },
     calls_used: 0,
     candidates: 0,
-    dates_fetched: 0,
+    leagues_fetched: 0,
     matched: 0,
     updated: 0,
     unchanged: 0,
-    ambiguous_flagged: 0,
-    not_found: 0,
     still_open_at_provider: 0,
+    unresolved: 0,
     by_competition: {},
     changes: [],
+    remainder: [],
     conflicts: [],
-    unmatched: [],
-
     errors: [],
     details_note:
-      "Project rule: API-Football may only update status/score on existing matches. Lineups, events and statistics stay Sofascore-owned and were not fetched.",
+      "Project rule: API-Football may only update status/score on existing matches. Identity, kickoff times, lineups, events and statistics stay Sofascore-owned and were not written.",
   };
 
   const finish = async (status: BackfillResult["status"], reason?: string) => {
@@ -204,18 +235,16 @@ export async function runBackfillApiFootball(options: {
 
   if (!apiKey) return finish("failed", "API_FOOTBALL_KEY missing");
 
-  const gate = async (): Promise<boolean> => {
+  const call = async (
+    path: string,
+  ): Promise<{ status: number; json: AnyRec | null; headers: Headers } | null> => {
+    if (result.calls_used >= maxCalls) return null;
     const { data: ok } = await supabaseAdmin.rpc("api_budget_take", {
       p_provider: PROVIDER,
       p_category: "bulk",
       p_count: 1,
     });
-    return ok === true;
-  };
-
-  const call = async (path: string): Promise<{ status: number; json: AnyRec | null; headers: Headers } | null> => {
-    if (result.calls_used >= maxCalls) return null;
-    if (!(await gate())) {
+    if (ok !== true) {
       result.errors.push("budget_exhausted");
       return null;
     }
@@ -254,7 +283,8 @@ export async function runBackfillApiFootball(options: {
     (typeof reqs?.["limit_day"] === "number" ? (reqs["limit_day"] as number) : null) ??
     (Number(result.plan.rate_limit_headers["x-ratelimit-requests-limit"]) || null);
   result.plan.requests_limit_day = limitDay;
-  result.plan.requests_current = typeof reqs?.["current"] === "number" ? (reqs["current"] as number) : null;
+  result.plan.requests_current =
+    typeof reqs?.["current"] === "number" ? (reqs["current"] as number) : null;
   if (statusRes.status !== 200) return finish("failed", "provider_status_not_ok");
 
   if (limitDay && limitDay > 0) {
@@ -282,16 +312,14 @@ export async function runBackfillApiFootball(options: {
   // ---------------------------------------------------------------- candidates
   const { data: rows, error: selErr } = await supabaseAdmin
     .from("matches")
-    .select(
-      "id, kickoff_at, status, home_score, away_score, competition_id, home_team_id, away_team_id",
-    )
+    .select("id, kickoff_at, status, home_score, away_score, competition_id, home_team_id, away_team_id")
     .lt("kickoff_at", options.cutoffIso)
     .or("status.is.null,status.not.in.(finished,canceled,postponed,awarded,removed)")
     .order("kickoff_at", { ascending: true })
     .limit(500);
   if (selErr) return finish("failed", selErr.message);
 
-  const candidates = rows ?? [];
+  const candidates = (rows ?? []).filter((m) => m.kickoff_at && m.competition_id);
   result.candidates = candidates.length;
   if (candidates.length === 0) return finish("success", "nothing_to_do");
 
@@ -302,7 +330,10 @@ export async function runBackfillApiFootball(options: {
 
   const [{ data: teams }, { data: comps }, { data: aliases }] = await Promise.all([
     supabaseAdmin.from("teams").select("id, name_en, name_he, short_name").in("id", teamIds),
-    supabaseAdmin.from("competitions").select("id, name_he").in("id", compIds),
+    supabaseAdmin
+      .from("competitions")
+      .select("id, name_he, tournament_id, season_calc_method")
+      .in("id", compIds),
     supabaseAdmin.from("team_aliases").select("team_id, alias").in("team_id", teamIds),
   ]);
 
@@ -317,116 +348,146 @@ export async function runBackfillApiFootball(options: {
     if (n.length > 0) cur.push(n);
     teamNames.set(a.team_id, cur);
   }
-  const compName = new Map((comps ?? []).map((c) => [c.id, c.name_he]));
+  const compById = new Map((comps ?? []).map((c) => [c.id, c]));
   const teamLabel = new Map((teams ?? []).map((t) => [t.id, t.name_en ?? t.name_he ?? t.id]));
 
+  const nameScore = (teamId: string | null, providerName: string): number => {
+    if (!teamId) return 0;
+    const pn = normalizeName(providerName);
+    let best = 0;
+    for (const f of teamNames.get(teamId) ?? []) best = Math.max(best, similarity(f, pn));
+    return best;
+  };
+
   for (const m of candidates) {
-    const key = compName.get(m.competition_id ?? "") ?? "ללא תחרות";
+    const key = compById.get(m.competition_id ?? "")?.name_he ?? "ללא תחרות";
     result.by_competition[key] ??= { before: 0, updated: 0 };
     result.by_competition[key]!.before += 1;
   }
 
-  const bestScore = (teamId: string | null, providerName: string): number => {
-    if (!teamId) return 0;
-    const forms = teamNames.get(teamId) ?? [];
-    const pn = normalizeName(providerName);
-    let best = 0;
-    for (const f of forms) best = Math.max(best, similarity(f, pn));
-    return best;
-  };
-
-  // ---------------------------------------------------------------- by date
-  const byDate = new Map<string, typeof candidates>();
+  // ------------------------------------------------- group by league + season
+  const groups = new Map<string, { league: number; season: number; rows: typeof candidates }>();
   for (const m of candidates) {
-    const d = String(m.kickoff_at).slice(0, 10);
-    const list = byDate.get(d) ?? [];
-    list.push(m);
-    byDate.set(d, list);
+    const comp = compById.get(m.competition_id ?? "");
+    const league = comp?.tournament_id ? LEAGUE_BY_TOURNAMENT[String(comp.tournament_id)] : undefined;
+    if (!league) {
+      result.unresolved += 1;
+      result.remainder.push({
+        match_id: m.id,
+        match: `${teamLabel.get(m.home_team_id ?? "") ?? "?"} - ${teamLabel.get(m.away_team_id ?? "") ?? "?"}`,
+        competition: comp?.name_he ?? "ללא תחרות",
+        db_kickoff: String(m.kickoff_at),
+        db_status: m.status ?? "null",
+        matched_by: null,
+        provider_fixture_id: null,
+        provider_kickoff: null,
+        provider_teams: null,
+        provider_status: null,
+        provider_score: null,
+        note: "no verified provider league mapping for this competition",
+      });
+      continue;
+    }
+    const season = seasonFor(String(m.kickoff_at), comp?.season_calc_method ?? null);
+    const key = `${league}:${season}`;
+    const g = groups.get(key) ?? { league, season, rows: [] as typeof candidates };
+    g.rows.push(m);
+    groups.set(key, g);
   }
 
-  for (const [day, list] of [...byDate.entries()].sort()) {
+  for (const [, group] of groups) {
     if (result.calls_used >= maxCalls) break;
-    const res = await call(`/fixtures?date=${day}&timezone=UTC`);
+    const res = await call(`/fixtures?league=${group.league}&season=${group.season}&timezone=UTC`);
     if (!res) break;
     if (res.status !== 200 || !res.json) continue;
-    result.dates_fetched += 1;
+    result.leagues_fetched += 1;
     const fixtures = (res.json["response"] as AnyRec[] | undefined) ?? [];
 
-    for (const m of list) {
-      const koMs = Date.parse(String(m.kickoff_at));
-      let best: { fx: AnyRec; score: number; delta: number } | null = null;
-      let second = 0;
-      let reversedBetter = false;
-
-      for (const fx of fixtures) {
-        const fxKo = Date.parse(String(fx["fixture"]?.["date"] ?? ""));
-        if (!Number.isFinite(fxKo) || Math.abs(fxKo - koMs) > 3 * 3600_000) continue;
-        const hName = String(fx["teams"]?.["home"]?.["name"] ?? "");
-        const aName = String(fx["teams"]?.["away"]?.["name"] ?? "");
-        const fwd = Math.min(bestScore(m.home_team_id, hName), bestScore(m.away_team_id, aName));
-        const rev = Math.min(bestScore(m.home_team_id, aName), bestScore(m.away_team_id, hName));
-        if (rev > fwd && rev >= 0.99) reversedBetter = true;
-        if (fwd > (best?.score ?? 0)) {
-          second = best?.score ?? 0;
-          best = { fx, score: fwd, delta: Math.abs(fxKo - koMs) };
-        } else if (fwd > second) second = fwd;
-      }
-
+    for (const m of group.rows) {
+      const comp = compById.get(m.competition_id ?? "");
+      const compKey = comp?.name_he ?? "ללא תחרות";
       const label = `${teamLabel.get(m.home_team_id ?? "") ?? "?"} - ${teamLabel.get(m.away_team_id ?? "") ?? "?"}`;
-      // Accept either an exact name match inside a wide time window, or a strong
-      // spelling-variant match whose kickoff is identical and clearly unique.
-      const accepted =
-        best != null &&
-        (best.score >= 0.99 ||
-          (best.score >= 0.6 && best.delta <= 20 * 60_000 && second <= best.score - 0.15));
-      if (!accepted || !best) {
-        result.not_found += 1;
+      const koMs = Date.parse(String(m.kickoff_at));
 
-        // Diagnostic only: closest provider fixture anywhere that day, no time window.
-        let diag: { name: string; score: number; when: string } | null = null;
-        for (const fx of fixtures) {
-          const hName = String(fx["teams"]?.["home"]?.["name"] ?? "");
-          const aName = String(fx["teams"]?.["away"]?.["name"] ?? "");
-          const s = Math.min(bestScore(m.home_team_id, hName), bestScore(m.away_team_id, aName));
-          if (s > (diag?.score ?? 0)) {
-            diag = { name: `${hName} - ${aName}`, score: Number(s.toFixed(2)), when: String(fx["fixture"]?.["date"] ?? "") };
-          }
-        }
-        result.unmatched.push({
-          match: label,
-          kickoff: String(m.kickoff_at),
-          competition: compName.get(m.competition_id ?? "") ?? "ללא תחרות",
-          closest: diag?.name ?? null,
-          closest_score: diag?.score ?? 0,
-          closest_kickoff: diag?.when ?? null,
-        });
-        continue;
+      const scored = fixtures.map((fx) => {
+        const h = nameScore(m.home_team_id, String(fx["teams"]?.["home"]?.["name"] ?? ""));
+        const a = nameScore(m.away_team_id, String(fx["teams"]?.["away"]?.["name"] ?? ""));
+        const when = Date.parse(String(fx["fixture"]?.["date"] ?? ""));
+        return { fx, h, a, min: Math.min(h, a), max: Math.max(h, a), delta: Math.abs(when - koMs) };
+      });
+
+      const near = scored.filter((c) => Number.isFinite(c.delta) && c.delta <= MATCH_WINDOW_MS);
+      const strongBoth = near.filter((c) => c.min >= STRONG);
+      const anchored = near.filter((c) => c.max >= STRONG && c.min >= NOT_CONTRADICTORY);
+      const pairSeason = scored.filter((c) => c.min >= STRONG && c.delta <= PAIR_WINDOW_MS);
+
+      let pick: (typeof scored)[number] | null = null;
+      let matchedBy: BackfillEvidence["matched_by"] = null;
+      if (strongBoth.length === 1) {
+        pick = strongBoth[0]!;
+        matchedBy = "both";
+      } else if (strongBoth.length === 0 && anchored.length === 1) {
+        pick = anchored[0]!;
+        matchedBy = "anchor";
+      } else if (strongBoth.length === 0 && anchored.length === 0 && pairSeason.length === 1) {
+        pick = pairSeason[0]!;
+        matchedBy = "pair";
       }
 
-      if (second >= 0.99 || reversedBetter) {
-        result.ambiguous_flagged += 1;
-        result.conflicts.push(`${label} @ ${String(m.kickoff_at).slice(0, 16)} — ambiguous/reversed candidate`);
-        if (!options.dryRun) {
-          await supabaseAdmin.from("matches").update({ needs_review: true } as never).eq("id", m.id);
-        }
+      const evidence: BackfillEvidence = {
+        match_id: m.id,
+        match: label,
+        competition: compKey,
+        db_kickoff: String(m.kickoff_at),
+        db_status: m.status ?? "null",
+        matched_by: matchedBy,
+        provider_fixture_id: pick ? Number(pick.fx["fixture"]?.["id"]) : null,
+        provider_kickoff: pick ? String(pick.fx["fixture"]?.["date"]) : null,
+        provider_teams: pick
+          ? `${String(pick.fx["teams"]?.["home"]?.["name"])} vs ${String(pick.fx["teams"]?.["away"]?.["name"])}`
+          : null,
+        provider_status: pick ? String(pick.fx["fixture"]?.["status"]?.["short"]) : null,
+        provider_score: pick
+          ? `${pick.fx["goals"]?.["home"] ?? "null"}-${pick.fx["goals"]?.["away"] ?? "null"}`
+          : null,
+      };
+
+      if (!pick || !matchedBy) {
+        result.unresolved += 1;
+        evidence.note =
+          near.length === 0
+            ? "no provider fixture within 3h of the stored kickoff, and no unique season pair"
+            : "ambiguous candidates — left untouched";
+        result.remainder.push(evidence);
         continue;
       }
 
       result.matched += 1;
-      const st = best.fx["fixture"]?.["status"] as AnyRec | undefined;
+      const st = pick.fx["fixture"]?.["status"] as AnyRec | undefined;
       const mapped = mapStatus(String(st?.["short"] ?? ""));
       if (!mapped) {
-        result.conflicts.push(`${label} — unmapped provider status ${String(st?.["short"])}`);
+        evidence.note = "unmapped provider status";
+        result.conflicts.push(evidence);
         continue;
       }
-      if (!mapped.final && mapped.status === "notstarted") {
+      if (mapped.status === "notstarted") {
+        // Provider says the fixture has not been played: the stored kickoff is
+        // a placeholder, not a missing result. Never invent an outcome.
         result.still_open_at_provider += 1;
+        evidence.note = "provider has this fixture as not started — stored kickoff is a placeholder";
+        result.remainder.push(evidence);
         continue;
       }
 
-      const goals = best.fx["goals"] as AnyRec | undefined;
+      const goals = pick.fx["goals"] as AnyRec | undefined;
       const hs = typeof goals?.["home"] === "number" ? (goals["home"] as number) : null;
       const as_ = typeof goals?.["away"] === "number" ? (goals["away"] as number) : null;
+      if (mapped.status === "finished" && (hs == null || as_ == null)) {
+        evidence.note = "provider finished without a score — skipped";
+        result.conflicts.push(evidence);
+        continue;
+      }
+
       const update: AnyRec = {
         status: mapped.status,
         live_source: LIVE_SOURCE,
@@ -438,10 +499,6 @@ export async function runBackfillApiFootball(options: {
         if (as_ != null) update["away_score"] = as_;
       }
       update["minute"] = mapped.live && typeof st?.["elapsed"] === "number" ? st["elapsed"] : null;
-      if (mapped.status === "finished" && (hs == null || as_ == null)) {
-        result.conflicts.push(`${label} — provider finished without a score, skipped`);
-        continue;
-      }
       if (mapped.live) result.still_open_at_provider += 1;
 
       if (m.status === mapped.status && m.home_score === hs && m.away_score === as_) {
@@ -461,20 +518,11 @@ export async function runBackfillApiFootball(options: {
         }
       }
       result.updated += 1;
-      const compKey = compName.get(m.competition_id ?? "") ?? "ללא תחרות";
       result.by_competition[compKey] ??= { before: 0, updated: 0 };
       result.by_competition[compKey]!.updated += 1;
-      result.changes.push({
-        match: label,
-        kickoff: String(m.kickoff_at),
-        competition: compKey,
-        from: m.status ?? "null",
-        to: mapped.status,
-        score: hs != null && as_ != null ? `${hs}-${as_}` : null,
-      });
+      result.changes.push(evidence);
     }
   }
 
-  const blocked = result.errors.length > 0;
-  return finish(blocked ? "partial" : "success");
+  return finish(result.errors.length > 0 ? "partial" : "success");
 }
