@@ -83,7 +83,7 @@ export function MatchHeaderCard({
             <span className="text-xl font-bold text-muted-foreground">VS</span>
           )}
           {isLive ? (
-            <span className="rounded-full bg-status-win/25 px-2 py-0.5 text-center text-[11px] font-medium text-status-win">
+            <span className="rounded-full bg-status-loss/15 px-2 py-0.5 text-center text-[11px] font-medium text-status-loss">
               {header.minute !== null ? (
                 <LtrNum>{header.minute}'</LtrNum>
               ) : (
