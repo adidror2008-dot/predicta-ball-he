@@ -323,6 +323,7 @@ export async function getMatchHeader(matchRef: string): Promise<MatchHeader | nu
     away_team_id: string | null;
     home_score: number | null;
     away_score: number | null;
+    minute: number | null;
   };
   let row: MatchRow | null = null;
 
