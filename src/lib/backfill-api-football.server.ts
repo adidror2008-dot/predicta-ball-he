@@ -354,7 +354,7 @@ export async function runBackfillApiFootball(options: {
 
     for (const m of list) {
       const koMs = Date.parse(String(m.kickoff_at));
-      let best: { fx: AnyRec; score: number } | null = null;
+      let best: { fx: AnyRec; score: number; delta: number } | null = null;
       let second = 0;
       let reversedBetter = false;
 
@@ -368,13 +368,20 @@ export async function runBackfillApiFootball(options: {
         if (rev > fwd && rev >= 0.99) reversedBetter = true;
         if (fwd > (best?.score ?? 0)) {
           second = best?.score ?? 0;
-          best = { fx, score: fwd };
+          best = { fx, score: fwd, delta: Math.abs(fxKo - koMs) };
         } else if (fwd > second) second = fwd;
       }
 
       const label = `${teamLabel.get(m.home_team_id ?? "") ?? "?"} - ${teamLabel.get(m.away_team_id ?? "") ?? "?"}`;
-      if (!best || best.score < 0.99) {
+      // Accept either an exact name match inside a wide time window, or a strong
+      // spelling-variant match whose kickoff is identical and clearly unique.
+      const accepted =
+        best != null &&
+        (best.score >= 0.99 ||
+          (best.score >= 0.6 && best.delta <= 20 * 60_000 && second <= best.score - 0.15));
+      if (!accepted) {
         result.not_found += 1;
+
         // Diagnostic only: closest provider fixture anywhere that day, no time window.
         let diag: { name: string; score: number; when: string } | null = null;
         for (const fx of fixtures) {
