@@ -112,10 +112,17 @@ describe("strict mapping", () => {
     { fixtureId: 2, homeName: "Napoli", awayName: "Lazio", kickoffIso: NOW, round: "R1" },
   ];
 
-  it("accepts a unique both-name match", () => {
-    const hit = resolveUniqueFixture([normalizeName("Lyon")], [normalizeName("Auxerre")], candidates);
+  it("accepts a unique both-name match through a stored alias", () => {
+    const lyonForms = [normalizeName("Lyon"), normalizeName("Olympique Lyonnais")];
+    const hit = resolveUniqueFixture(lyonForms, [normalizeName("Auxerre")], candidates);
     expect(hit?.fixture.fixtureId).toBe(1);
   });
+
+  it("rejects a short name with no matching alias", () => {
+    const hit = resolveUniqueFixture([normalizeName("Lyon")], [normalizeName("Auxerre")], candidates);
+    expect(hit).toBeNull();
+  });
+
 
   it("rejects a one-sided (anchor) match", () => {
     const hit = resolveUniqueFixture(
