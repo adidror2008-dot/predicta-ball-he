@@ -23,8 +23,12 @@ export type Database = {
           live_reserve_daily: number
           monthly_limit: number | null
           notes: string | null
+          pace_enabled: boolean
           per_minute_limit: number | null
           provider: string
+          reported_at: string | null
+          reported_period: string | null
+          reported_used: number | null
         }
         Insert: {
           configured?: boolean
@@ -34,8 +38,12 @@ export type Database = {
           live_reserve_daily?: number
           monthly_limit?: number | null
           notes?: string | null
+          pace_enabled?: boolean
           per_minute_limit?: number | null
           provider: string
+          reported_at?: string | null
+          reported_period?: string | null
+          reported_used?: number | null
         }
         Update: {
           configured?: boolean
@@ -45,8 +53,12 @@ export type Database = {
           live_reserve_daily?: number
           monthly_limit?: number | null
           notes?: string | null
+          pace_enabled?: boolean
           per_minute_limit?: number | null
           provider?: string
+          reported_at?: string | null
+          reported_period?: string | null
+          reported_used?: number | null
         }
         Relationships: []
       }
@@ -730,10 +742,14 @@ export type Database = {
         Row: {
           evidence: Json
           id: string
+          last_checked_at: string | null
           league_id: number | null
           match_id: string
+          next_check_at: string | null
           provider: string
           provider_fixture_id: number
+          provider_kickoff_at: string | null
+          provider_status: string | null
           round: string | null
           season: number | null
           verified_at: string
@@ -741,10 +757,14 @@ export type Database = {
         Insert: {
           evidence?: Json
           id?: string
+          last_checked_at?: string | null
           league_id?: number | null
           match_id: string
+          next_check_at?: string | null
           provider: string
           provider_fixture_id: number
+          provider_kickoff_at?: string | null
+          provider_status?: string | null
           round?: string | null
           season?: number | null
           verified_at?: string
@@ -752,10 +772,14 @@ export type Database = {
         Update: {
           evidence?: Json
           id?: string
+          last_checked_at?: string | null
           league_id?: number | null
           match_id?: string
+          next_check_at?: string | null
           provider?: string
           provider_fixture_id?: number
+          provider_kickoff_at?: string | null
+          provider_status?: string | null
           round?: string | null
           season?: number | null
           verified_at?: string
@@ -1392,6 +1416,48 @@ export type Database = {
         }
         Relationships: []
       }
+      provider_discovery: {
+        Row: {
+          attempts: number
+          last_attempt_at: string | null
+          last_error: string | null
+          last_fixture_count: number | null
+          league_id: number
+          next_attempt_at: string
+          provider: string
+          resolved_count: number
+          season: number
+          unresolved_count: number
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          last_attempt_at?: string | null
+          last_error?: string | null
+          last_fixture_count?: number | null
+          league_id: number
+          next_attempt_at?: string
+          provider: string
+          resolved_count?: number
+          season: number
+          unresolved_count?: number
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          last_attempt_at?: string | null
+          last_error?: string | null
+          last_fixture_count?: number | null
+          league_id?: number
+          next_attempt_at?: string
+          provider?: string
+          resolved_count?: number
+          season?: number
+          unresolved_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           auth: string | null
@@ -1817,6 +1883,10 @@ export type Database = {
     }
     Functions: {
       admin_email: { Args: never; Returns: string }
+      api_budget_note_reported: {
+        Args: { p_period: string; p_provider: string; p_used: number }
+        Returns: undefined
+      }
       api_budget_status: { Args: { p_provider: string }; Returns: Json }
       api_budget_take: {
         Args: { p_category: string; p_count?: number; p_provider: string }
@@ -1845,7 +1915,12 @@ export type Database = {
       }
       pb_lock_due_predictions: { Args: never; Returns: number }
       pb_refresh_match_history: { Args: never; Returns: number }
+      pb_release_lease: { Args: { p_key: string }; Returns: undefined }
       pb_settle_finished_matches: { Args: never; Returns: number }
+      pb_try_lease: {
+        Args: { p_key: string; p_ttl_seconds: number }
+        Returns: boolean
+      }
       recompute_competition_baselines: {
         Args: never
         Returns: {
