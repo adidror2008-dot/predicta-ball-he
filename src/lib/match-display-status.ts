@@ -10,7 +10,13 @@
  * their own past section — never under "upcoming".
  */
 
-export type MatchDisplayStatus = "scheduled" | "live" | "finished" | "postponed" | "pending";
+export type MatchDisplayStatus =
+  | "scheduled"
+  | "live"
+  | "finished"
+  | "postponed"
+  | "pending"
+  | "unscheduled";
 
 export const STALE_AFTER_MS = 4 * 60 * 60 * 1000;
 
@@ -18,7 +24,9 @@ const FINISHED = new Set(["finished", "ended", "afterET", "ap", "awarded"]);
 const LIVE = new Set(["inprogress", "live", "halftime"]);
 const POSTPONED = new Set(["postponed", "canceled", "cancelled", "removed"]);
 
-export function rawToDisplayStatus(status: string | null | undefined): Exclude<MatchDisplayStatus, "pending"> {
+export function rawToDisplayStatus(
+  status: string | null | undefined,
+): Exclude<MatchDisplayStatus, "pending" | "unscheduled"> {
   if (status && POSTPONED.has(status)) return "postponed";
   if (status && FINISHED.has(status)) return "finished";
   if (status && LIVE.has(status)) return "live";
@@ -28,19 +36,26 @@ export function rawToDisplayStatus(status: string | null | undefined): Exclude<M
 /**
  * `pending` when the raw status is non-final and kickoff is >= 4h in the past.
  * Final statuses (finished / postponed) are never downgraded.
+ *
+ * A non-final match whose kickoff time is explicitly unconfirmed carries a
+ * placeholder date from the source, so an elapsed placeholder proves nothing:
+ * it is `unscheduled`, never "pending" or "live", and never a result.
  */
 export function deriveDisplayStatus(
   status: string | null | undefined,
   kickoffAt: string | null | undefined,
   nowMs: number = Date.now(),
+  timeConfirmed: boolean = true,
 ): MatchDisplayStatus {
   const base = rawToDisplayStatus(status);
   if (base === "finished" || base === "postponed") return base;
   if (!kickoffAt) return base;
   const kickoff = Date.parse(kickoffAt);
   if (!Number.isFinite(kickoff)) return base;
-  return nowMs - kickoff >= STALE_AFTER_MS ? "pending" : base;
+  if (nowMs - kickoff < STALE_AFTER_MS) return base;
+  return timeConfirmed ? "pending" : "unscheduled";
 }
+
 
 export const DISPLAY_STATUS_LABEL_HE: Record<MatchDisplayStatus, string> = {
   scheduled: "טרם החל",
@@ -48,21 +63,30 @@ export const DISPLAY_STATUS_LABEL_HE: Record<MatchDisplayStatus, string> = {
   finished: "הסתיים",
   postponed: "נדחה",
   pending: "ממתין לעדכון",
+  unscheduled: "מועד טרם נקבע",
 };
 
 /** Caption for a score that is the last one received, not a verified final. */
 export const PENDING_SCORE_LABEL_HE = "תוצאה אחרונה שנקלטה";
 
 /** List sections, in display order. */
-export type MatchSection = "finished" | "pending" | "live" | "upcoming" | "postponed";
+export type MatchSection = "finished" | "pending" | "live" | "upcoming" | "unscheduled" | "postponed";
 
-export const SECTION_ORDER: readonly MatchSection[] = ["finished", "pending", "live", "upcoming", "postponed"];
+export const SECTION_ORDER: readonly MatchSection[] = [
+  "finished",
+  "pending",
+  "live",
+  "upcoming",
+  "unscheduled",
+  "postponed",
+];
 
 export const SECTION_TITLE_HE: Record<MatchSection, string | null> = {
   finished: null,
   pending: "משחקי עבר — ממתינים לעדכון",
   live: "משחקים חיים",
   upcoming: "משחקים קרובים",
+  unscheduled: "משחקים שמועדם טרם נקבע",
   postponed: "משחקים שנדחו",
 };
 
@@ -76,6 +100,8 @@ export function sectionFor(display: MatchDisplayStatus): MatchSection {
       return "live";
     case "postponed":
       return "postponed";
+    case "unscheduled":
+      return "unscheduled";
     default:
       return "upcoming";
   }
@@ -85,7 +111,9 @@ export function sectionFor(display: MatchDisplayStatus): MatchSection {
  * One classification for grouping and for the card/header badge. `nowMs` is a
  * parameter so callers re-evaluate on a clock, not only when data changes.
  */
-export function groupMatches<T extends { status: string | null; kickoffAt: string }>(
+export function groupMatches<
+  T extends { status: string | null; kickoffAt: string; timeConfirmed?: boolean },
+>(
   matches: readonly T[],
   nowMs: number,
 ): Record<MatchSection, Array<T & { display: MatchDisplayStatus }>> {
@@ -94,12 +122,14 @@ export function groupMatches<T extends { status: string | null; kickoffAt: strin
     pending: [],
     live: [],
     upcoming: [],
+    unscheduled: [],
     postponed: [],
   };
   const sorted = [...matches].sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt));
   for (const m of sorted) {
-    const display = deriveDisplayStatus(m.status, m.kickoffAt, nowMs);
+    const display = deriveDisplayStatus(m.status, m.kickoffAt, nowMs, m.timeConfirmed !== false);
     out[sectionFor(display)].push({ ...m, display });
+
   }
   return out;
 }

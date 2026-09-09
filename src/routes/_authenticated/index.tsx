@@ -133,6 +133,7 @@ function MatchesPanel({
       pending: g.pending.map(toCard),
       live: g.live.map(toCard),
       upcoming: g.upcoming.map(toCard),
+      unscheduled: g.unscheduled.map(toCard),
       postponed: g.postponed.map(toCard),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

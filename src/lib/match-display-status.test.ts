@@ -97,6 +97,40 @@ describe("groupMatches — list sections", () => {
   it("uses the same mapping for the badge and the section, in a fixed order", () => {
     expect(sectionFor("pending")).toBe("pending");
     expect(sectionFor("scheduled")).toBe("upcoming");
-    expect(SECTION_ORDER).toEqual(["finished", "pending", "live", "upcoming", "postponed"]);
+    expect(SECTION_ORDER).toEqual([
+      "finished",
+      "pending",
+      "live",
+      "upcoming",
+      "unscheduled",
+      "postponed",
+    ]);
+  });
+});
+
+describe("unconfirmed kickoff placeholders", () => {
+  const longAgo = "2026-09-08T19:00:00Z";
+  const now = Date.parse("2026-09-09T12:00:00Z");
+
+  it("never marks an unconfirmed-date fixture as pending", () => {
+    expect(deriveDisplayStatus("notstarted", longAgo, now, false)).toBe("unscheduled");
+  });
+
+  it("still marks a confirmed-date fixture as pending", () => {
+    expect(deriveDisplayStatus("notstarted", longAgo, now, true)).toBe("pending");
+  });
+
+  it("groups unconfirmed fixtures away from upcoming and pending", () => {
+    const g = groupMatches(
+      [{ status: "notstarted", kickoffAt: longAgo, timeConfirmed: false }],
+      now,
+    );
+    expect(g.unscheduled).toHaveLength(1);
+    expect(g.upcoming).toHaveLength(0);
+    expect(g.pending).toHaveLength(0);
+  });
+
+  it("does not invent a result for an unconfirmed fixture", () => {
+    expect(deriveDisplayStatus("notstarted", longAgo, now, false)).not.toBe("finished");
   });
 });
