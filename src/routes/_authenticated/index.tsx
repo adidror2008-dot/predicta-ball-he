@@ -23,6 +23,7 @@ import { applyOrder, useChipPrefs } from "@/lib/chip-prefs";
 import {
   groupMatches,
   SECTION_ORDER,
+  SECTION_NOTE_HE,
   SECTION_TITLE_HE,
   type MatchDisplayStatus,
 } from "@/lib/match-display-status";
@@ -133,7 +134,7 @@ function MatchesPanel({
       pending: g.pending.map(toCard),
       live: g.live.map(toCard),
       upcoming: g.upcoming.map(toCard),
-      unscheduled: g.unscheduled.map(toCard),
+      unverified: g.unverified.map(toCard),
       postponed: g.postponed.map(toCard),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
