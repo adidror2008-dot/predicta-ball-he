@@ -82,8 +82,8 @@ function normalizeName(raw: string): string[] {
     .filter((t) => t.length > 0 && !DROP_TOKENS.has(t) && !/^\d+$/.test(t));
 }
 
-/** 1 = one token set fully contains the other, else Jaccard-ish overlap ratio. */
-function similarity(a: string[], b: string[]): number {
+/** 1 = one token set fully contains the other, else overlap ratio. */
+function tokenSimilarity(a: string[], b: string[]): number {
   if (a.length === 0 || b.length === 0) return 0;
   const sa = new Set(a);
   const sb = new Set(b);
@@ -92,6 +92,29 @@ function similarity(a: string[], b: string[]): number {
   if (inter === 0) return 0;
   return inter / Math.min(sa.size, sb.size);
 }
+
+/** Dice bigram coefficient over the collapsed letter string — tolerates spelling variants. */
+function diceSimilarity(a: string, b: string): number {
+  if (a.length < 2 || b.length < 2) return a === b ? 1 : 0;
+  const grams = (s: string) => {
+    const m = new Map<string, number>();
+    for (let i = 0; i < s.length - 1; i += 1) {
+      const g = s.slice(i, i + 2);
+      m.set(g, (m.get(g) ?? 0) + 1);
+    }
+    return m;
+  };
+  const ga = grams(a);
+  const gb = grams(b);
+  let inter = 0;
+  for (const [g, n] of ga) inter += Math.min(n, gb.get(g) ?? 0);
+  return (2 * inter) / (a.length - 1 + (b.length - 1));
+}
+
+function similarity(a: string[], b: string[]): number {
+  return Math.max(tokenSimilarity(a, b), diceSimilarity(a.join(""), b.join("")));
+}
+
 
 function mapStatus(short: string): { status: string; final: boolean; live: boolean } | null {
   switch (short) {
