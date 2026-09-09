@@ -39,6 +39,11 @@ function MatchPage() {
     refetchOnWindowFocus: true,
   });
 
+  // Stats/events exist for any match that has actually kicked off — live and
+  // awaiting-update matches included, not only settled ones.
+  const display = header ? deriveDisplayStatus(header.status, header.kickoffAt) : null;
+  const hasMatchData = display === "finished" || display === "live" || display === "pending";
+
   return (
     <main className="flex flex-col gap-6 px-4 pt-5 pb-8">
       <header className="flex items-center gap-2">
