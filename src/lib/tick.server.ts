@@ -259,46 +259,86 @@ export async function runTick(): Promise<TickResult> {
     ]),
   );
 
-
-  // ---- STEP 2: one live sweep for the whole world
+  // ---- STEP 2: score/status sweep.
+  // API-Football is PRIMARY: one aggregated /fixtures?live=all request per
+  // tick serves every user, plus one bounded reconciliation read. Sofascore
+  // is only used for score/status when API-Football is unavailable, and keeps
+  // owning identity, lineups, statistics and events.
   const seenLive = new Set<string>();
   let budgetBlocked = false;
+  let afDetail: Record<string, any> | null = null;
+  let afUsable = false;
 
-  if (await takeBudget()) {
-    const res = await call(`/api/v1/sport/football/events/live`);
-    if (res.ok && res.json) {
-      const events: Array<Record<string, any>> = res.json["events"] ?? [];
-      for (const ev of events) {
-        const externalId = String(ev["id"]);
-        const mine = byExternalId.get(externalId);
-        if (!mine) continue; // never insert from the live feed
-        seenLive.add(externalId);
+  try {
+    const { runAfLive } = await import("@/lib/live-api-football.server");
+    const af = await runAfLive();
+    afUsable = af.key_present && af.provider_error === null && !af.budget_blocked;
+    for (const { row, update } of af.applied) {
+      liveUpdated += 1;
+      if (row.external_id) seenLive.add(String(row.external_id));
+      const snap = snapshots.get(row.id) ?? {
+        match_id: row.id,
+        external_id: String(row.external_id ?? ""),
+        competition_id: row.competition_id,
+        status: row.status,
+        prev_status: row.status,
+        home_score: row.home_score,
+        away_score: row.away_score,
+        prev_home_score: row.home_score,
+        prev_away_score: row.away_score,
+      };
+      snap.status = update.status;
+      snap.home_score = update.home_score;
+      snap.away_score = update.away_score;
+      snapshots.set(row.id, snap);
+    }
+    const { applied: _applied, ...summary } = af;
+    afDetail = summary;
+    if (af.budget_blocked) budgetBlocked = true;
+  } catch (e) {
+    afDetail = { error: e instanceof Error ? e.message : "api-football live failed" };
+  }
 
-        const { error } = await supabaseAdmin
-          .from("matches")
-          .update({
-            status: ev["status"]?.["type"] ?? mine.status,
-            minute: liveMinute(ev),
-            home_score: ev["homeScore"]?.["current"] ?? null,
-            away_score: ev["awayScore"]?.["current"] ?? null,
-            live_source: SOURCE,
-            fetched_at: new Date().toISOString(),
-          })
-          .eq("id", mine.id);
-        if (!error) {
-          liveUpdated += 1;
-          const snap = snapshots.get(mine.id);
-          if (snap) {
-            snap.status = ev["status"]?.["type"] ?? snap.status;
-            snap.home_score = ev["homeScore"]?.["current"] ?? snap.home_score;
-            snap.away_score = ev["awayScore"]?.["current"] ?? snap.away_score;
+  if (!afUsable) {
+    // Fallback only — the primary provider could not be used this tick.
+    if (await takeBudget()) {
+      const res = await call(`/api/v1/sport/football/events/live`);
+      if (res.ok && res.json) {
+        const events: Array<Record<string, any>> = res.json["events"] ?? [];
+        for (const ev of events) {
+          const externalId = String(ev["id"]);
+          const mine = byExternalId.get(externalId);
+          if (!mine) continue; // never insert from the live feed
+          seenLive.add(externalId);
+
+          const { error } = await supabaseAdmin
+            .from("matches")
+            .update({
+              status: ev["status"]?.["type"] ?? mine.status,
+              minute: liveMinute(ev),
+              home_score: ev["homeScore"]?.["current"] ?? null,
+              away_score: ev["awayScore"]?.["current"] ?? null,
+              live_source: SOURCE,
+              fetched_at: new Date().toISOString(),
+            })
+            .eq("id", mine.id);
+          if (!error) {
+            liveUpdated += 1;
+            const snap = snapshots.get(mine.id);
+            if (snap) {
+              snap.status = ev["status"]?.["type"] ?? snap.status;
+              snap.home_score = ev["homeScore"]?.["current"] ?? snap.home_score;
+              snap.away_score = ev["awayScore"]?.["current"] ?? snap.away_score;
+            }
           }
         }
       }
+    } else {
+      budgetBlocked = true;
     }
-  } else {
-    budgetBlocked = true;
   }
+
+
 
   // ---- STEP 3: settle stale matches per competition
   const stale = active.filter(
