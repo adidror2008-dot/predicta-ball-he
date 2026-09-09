@@ -310,7 +310,7 @@ export async function getMatchHeader(matchRef: string): Promise<MatchHeader | nu
     supabaseAdmin
       .from("matches")
       .select(
-        "id, external_id, status, kickoff_at, venue, home_team_id, away_team_id, home_score, away_score",
+        "id, external_id, status, kickoff_at, venue, home_team_id, away_team_id, home_score, away_score, minute",
       );
 
   type MatchRow = {
