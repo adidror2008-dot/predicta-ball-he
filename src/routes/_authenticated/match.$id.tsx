@@ -9,6 +9,7 @@ import { MatchPitchLineups } from "@/components/predictaball/match-pitch-lineups
 import { MatchEventsTab } from "@/components/predictaball/match-events-tab";
 import { MatchStatsTab } from "@/components/predictaball/match-stats-tab";
 import { getMatchHeaderFn } from "@/lib/match-details-read.functions";
+import { deriveDisplayStatus } from "@/lib/match-display-status";
 
 export const Route = createFileRoute("/_authenticated/match/$id")({
   head: () => ({
