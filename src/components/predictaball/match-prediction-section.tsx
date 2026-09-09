@@ -3,7 +3,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { EmptyState, LtrNum, SectionTitle, SkeletonBlock } from "./ui-bits";
 import { getMatchPredictionFn } from "@/lib/match-details-read.functions";
 import type { MatchHeader, MatchPrediction } from "@/lib/match-details-read.server";
+import { predictionVerdict } from "@/lib/prediction-verdict";
 import { cn } from "@/lib/utils";
+
 
 function pct(v: number | null) {
   if (v === null) return null;
