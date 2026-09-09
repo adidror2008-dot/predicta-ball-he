@@ -364,6 +364,7 @@ export async function getMatchHeader(matchRef: string): Promise<MatchHeader | nu
     awayLogo,
     homeScore: row.home_score,
     awayScore: row.away_score,
+    minute: row.minute ?? null,
   };
 }
 
