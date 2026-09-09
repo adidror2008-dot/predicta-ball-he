@@ -9,6 +9,7 @@ import { MatchPitchLineups } from "@/components/predictaball/match-pitch-lineups
 import { MatchEventsTab } from "@/components/predictaball/match-events-tab";
 import { MatchStatsTab } from "@/components/predictaball/match-stats-tab";
 import { getMatchHeaderFn } from "@/lib/match-details-read.functions";
+import { deriveDisplayStatus } from "@/lib/match-display-status";
 
 export const Route = createFileRoute("/_authenticated/match/$id")({
   head: () => ({
@@ -39,6 +40,11 @@ function MatchPage() {
     refetchOnWindowFocus: true,
   });
 
+  // Stats/events exist for any match that has actually kicked off — live and
+  // awaiting-update matches included, not only settled ones.
+  const display = header ? deriveDisplayStatus(header.status, header.kickoffAt) : null;
+  const hasMatchData = display === "finished" || display === "live" || display === "pending";
+
   return (
     <main className="flex flex-col gap-6 px-4 pt-5 pb-8">
       <header className="flex items-center gap-2">
@@ -64,14 +70,14 @@ function MatchPage() {
         <MatchPitchLineups matchRef={id} />
       </section>
 
-      {header?.isFinished ? (
+      {hasMatchData ? (
         <section>
           <SectionTitle>סטטיסטיקות</SectionTitle>
           <MatchStatsTab matchRef={id} />
         </section>
       ) : null}
 
-      {header?.isFinished ? (
+      {hasMatchData ? (
         <section>
           <SectionTitle>אירועי המשחק</SectionTitle>
           <MatchEventsTab matchRef={id} />

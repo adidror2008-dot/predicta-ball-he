@@ -19,6 +19,7 @@ export type MatchHeader = {
   awayLogo: string | null;
   homeScore: number | null;
   awayScore: number | null;
+  minute: number | null;
 };
 
 export type PredictionFactor = {
@@ -309,7 +310,7 @@ export async function getMatchHeader(matchRef: string): Promise<MatchHeader | nu
     supabaseAdmin
       .from("matches")
       .select(
-        "id, external_id, status, kickoff_at, venue, home_team_id, away_team_id, home_score, away_score",
+        "id, external_id, status, kickoff_at, venue, home_team_id, away_team_id, home_score, away_score, minute",
       );
 
   type MatchRow = {
@@ -322,6 +323,7 @@ export async function getMatchHeader(matchRef: string): Promise<MatchHeader | nu
     away_team_id: string | null;
     home_score: number | null;
     away_score: number | null;
+    minute: number | null;
   };
   let row: MatchRow | null = null;
 
@@ -362,6 +364,7 @@ export async function getMatchHeader(matchRef: string): Promise<MatchHeader | nu
     awayLogo,
     homeScore: row.home_score,
     awayScore: row.away_score,
+    minute: row.minute ?? null,
   };
 }
 
