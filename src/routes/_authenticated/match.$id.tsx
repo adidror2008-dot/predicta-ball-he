@@ -64,14 +64,14 @@ function MatchPage() {
         <MatchPitchLineups matchRef={id} />
       </section>
 
-      {header?.isFinished ? (
+      {hasMatchData ? (
         <section>
           <SectionTitle>סטטיסטיקות</SectionTitle>
           <MatchStatsTab matchRef={id} />
         </section>
       ) : null}
 
-      {header?.isFinished ? (
+      {hasMatchData ? (
         <section>
           <SectionTitle>אירועי המשחק</SectionTitle>
           <MatchEventsTab matchRef={id} />
