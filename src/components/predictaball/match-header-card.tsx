@@ -57,8 +57,11 @@ export function MatchHeaderCard({
   const display = deriveDisplayStatus(header.status, header.kickoffAt);
   const isPostponed = display === "postponed";
   const isAwaitingUpdate = display === "pending";
+  const isLive = display === "live";
   const hasScore =
-    (header.isFinished || isAwaitingUpdate) && header.homeScore !== null && header.awayScore !== null;
+    (header.isFinished || isAwaitingUpdate || isLive) &&
+    header.homeScore !== null &&
+    header.awayScore !== null;
   const date = isPostponed ? null : formatDate(header.kickoffAt);
   const time = isPostponed ? null : formatTime(header.kickoffAt);
 
