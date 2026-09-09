@@ -406,15 +406,21 @@ export async function runTick(): Promise<TickResult> {
     }
   }
 
-  // ---- STEP 3b: matches that were live on an earlier tick but dropped out of the feed
-  const droppedFromLive = active
-    .filter(
-      (m) =>
-        !seenLive.has(String(m.external_id)) &&
-        m.live_source === SOURCE &&
-        !FINAL_STATUS_TYPES.includes(String(m.status)),
-    )
-    .slice(0, MAX_FINAL_FETCHES);
+  // ---- STEP 3b: matches that were live on an earlier tick but dropped out of
+  // the Sofascore feed. Absence is never treated as "finished" — the event is
+  // read explicitly. API-Football-sourced rows are reconciled by their own
+  // step inside runAfLive.
+  const droppedFromLive = !apiKey
+    ? []
+    : active
+        .filter(
+          (m) =>
+            !seenLive.has(String(m.external_id)) &&
+            m.live_source === SOURCE &&
+            !FINAL_STATUS_TYPES.includes(String(m.status)),
+        )
+        .slice(0, MAX_FINAL_FETCHES);
+
 
   for (const m of droppedFromLive) {
     if (!(await takeBudget())) {
