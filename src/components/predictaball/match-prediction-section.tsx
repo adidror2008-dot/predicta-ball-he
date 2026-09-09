@@ -3,17 +3,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { EmptyState, LtrNum, SectionTitle, SkeletonBlock } from "./ui-bits";
 import { getMatchPredictionFn } from "@/lib/match-details-read.functions";
 import type { MatchHeader, MatchPrediction } from "@/lib/match-details-read.server";
+import { predictionVerdict } from "@/lib/prediction-verdict";
 import { cn } from "@/lib/utils";
+
 
 function pct(v: number | null) {
   if (v === null) return null;
   const n = v <= 1 ? v * 100 : v;
   return Math.round(n);
-}
-
-function sign(h: number | null, a: number | null) {
-  if (h === null || a === null) return null;
-  return h > a ? "home" : h < a ? "away" : "draw";
 }
 
 const dateFmt = new Intl.DateTimeFormat("he-IL", {
@@ -36,17 +33,15 @@ function formatStamp(iso: string | null) {
 }
 
 function verdict(header: MatchHeader, predH: number | null, predA: number | null) {
-  if (!header.isFinished || predH === null || predA === null) return null;
-  const actualH = header.homeScore;
-  const actualA = header.awayScore;
-  if (actualH === null || actualA === null) return null;
-
-  if (actualH === predH && actualA === predA)
-    return { text: "קלע בול", className: "bg-status-win/25 text-status-win" };
-  if (sign(actualH, actualA) === sign(predH, predA))
-    return { text: "צדק", className: "bg-status-win/15 text-status-win" };
-  return { text: "פספס", className: "bg-status-loss/20 text-status-loss" };
+  return predictionVerdict({
+    isFinished: header.isFinished,
+    predictedHome: predH,
+    predictedAway: predA,
+    actualHome: header.homeScore,
+    actualAway: header.awayScore,
+  });
 }
+
 
 function teamLabel(side: "home" | "away" | null, header: MatchHeader | null | undefined) {
   if (side === "home") return header?.homeName || "קבוצת הבית";

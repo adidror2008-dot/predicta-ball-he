@@ -287,27 +287,41 @@ export async function runBackfillApiFootball(options: {
     typeof reqs?.["current"] === "number" ? (reqs["current"] as number) : null;
   if (statusRes.status !== 200) return finish("failed", "provider_status_not_ok");
 
-  if (limitDay && limitDay > 0) {
-    const reserve = Math.max(1, Math.round(limitDay * 0.05));
+  // The /status probe REPORTS the provider plan; it must never raise the
+  // configured operating ceiling back to the raw provider limit. A configured
+  // row is left exactly as it is and only observed values are reported.
+  const { data: existingQuota } = await supabaseAdmin
+    .from("api_quotas")
+    .select("daily_limit, live_reserve_daily, configured")
+    .eq("provider", PROVIDER)
+    .maybeSingle();
+
+  if (existingQuota?.configured) {
+    result.plan.daily_limit_applied = existingQuota.daily_limit;
+    result.plan.reserve_applied = existingQuota.live_reserve_daily;
+  } else if (limitDay && limitDay > 0) {
+    // No operating ceiling configured yet: seed a conservative one (80% of the
+    // provider limit, 30% of that reserved for live polling).
+    const operating = Math.floor(limitDay * 0.8);
+    const reserve = Math.floor(operating * 0.3);
     const { error: qErr } = await supabaseAdmin.from("api_quotas").upsert(
       {
         provider: PROVIDER,
-        daily_limit: limitDay,
-        monthly_limit: null,
-        per_minute_limit: null,
+        daily_limit: operating,
         live_reserve_daily: reserve,
         configured: true,
-        notes: `PRO plan verified against provider /status on ${new Date().toISOString().slice(0, 10)}; daily_limit=${limitDay}, 5% reserve kept.`,
+        notes: `Provider /status reported ${limitDay}/day on ${new Date().toISOString().slice(0, 10)}; conservative operating ceiling ${operating}/day with ${reserve}/day live reserve.`,
       } as never,
       { onConflict: "provider" },
     );
     if (qErr) result.errors.push(`quota_upsert: ${qErr.message}`);
     else {
       result.plan.quota_row_updated = true;
-      result.plan.daily_limit_applied = limitDay;
+      result.plan.daily_limit_applied = operating;
       result.plan.reserve_applied = reserve;
     }
   }
+
 
   // ---------------------------------------------------------------- candidates
   const { data: rows, error: selErr } = await supabaseAdmin

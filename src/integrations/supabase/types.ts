@@ -17,6 +17,8 @@ export type Database = {
       api_quotas: {
         Row: {
           configured: boolean
+          cycle_limit: number | null
+          cycle_start_day: number | null
           daily_limit: number | null
           live_reserve_daily: number
           monthly_limit: number | null
@@ -26,6 +28,8 @@ export type Database = {
         }
         Insert: {
           configured?: boolean
+          cycle_limit?: number | null
+          cycle_start_day?: number | null
           daily_limit?: number | null
           live_reserve_daily?: number
           monthly_limit?: number | null
@@ -35,6 +39,8 @@ export type Database = {
         }
         Update: {
           configured?: boolean
+          cycle_limit?: number | null
+          cycle_start_day?: number | null
           daily_limit?: number | null
           live_reserve_daily?: number
           monthly_limit?: number | null
@@ -88,6 +94,24 @@ export type Database = {
           category?: string
           day?: string
           id?: string
+          provider?: string
+        }
+        Relationships: []
+      }
+      api_usage_minute: {
+        Row: {
+          calls: number
+          minute: string
+          provider: string
+        }
+        Insert: {
+          calls?: number
+          minute: string
+          provider: string
+        }
+        Update: {
+          calls?: number
+          minute?: string
           provider?: string
         }
         Relationships: []
@@ -695,6 +719,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "match_follows_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_provider_map: {
+        Row: {
+          evidence: Json
+          id: string
+          league_id: number | null
+          match_id: string
+          provider: string
+          provider_fixture_id: number
+          round: string | null
+          season: number | null
+          verified_at: string
+        }
+        Insert: {
+          evidence?: Json
+          id?: string
+          league_id?: number | null
+          match_id: string
+          provider: string
+          provider_fixture_id: number
+          round?: string | null
+          season?: number | null
+          verified_at?: string
+        }
+        Update: {
+          evidence?: Json
+          id?: string
+          league_id?: number | null
+          match_id?: string
+          provider?: string
+          provider_fixture_id?: number
+          round?: string | null
+          season?: number | null
+          verified_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_provider_map_match_id_fkey"
             columns: ["match_id"]
             isOneToOne: false
             referencedRelation: "matches"
@@ -1749,6 +1817,7 @@ export type Database = {
     }
     Functions: {
       admin_email: { Args: never; Returns: string }
+      api_budget_status: { Args: { p_provider: string }; Returns: Json }
       api_budget_take: {
         Args: { p_category: string; p_count?: number; p_provider: string }
         Returns: boolean
