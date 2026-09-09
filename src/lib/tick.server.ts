@@ -358,14 +358,17 @@ export async function runTick(): Promise<TickResult> {
     staleByCompetition.set(m.competition_id, list);
   }
 
-  // oldest stale first
-  const competitionOrder = Array.from(staleByCompetition.entries())
-    .sort((a, b) => {
-      const oldest = (list: typeof stale) =>
-        Math.min(...list.map((m) => new Date(m.kickoff_at!).getTime()));
-      return oldest(a[1]) - oldest(b[1]);
-    })
-    .slice(0, MAX_SETTLE_COMPETITIONS);
+  // oldest stale first (Sofascore-side settlement needs its own key)
+  const competitionOrder = !apiKey
+    ? []
+    : Array.from(staleByCompetition.entries())
+        .sort((a, b) => {
+          const oldest = (list: typeof stale) =>
+            Math.min(...list.map((m) => new Date(m.kickoff_at!).getTime()));
+          return oldest(a[1]) - oldest(b[1]);
+        })
+        .slice(0, MAX_SETTLE_COMPETITIONS);
+
 
   for (const [competitionId, matches] of competitionOrder) {
     const { data: comp } = await supabaseAdmin
