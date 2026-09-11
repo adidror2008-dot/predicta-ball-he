@@ -1,16 +1,20 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   buildAfUpdate,
+  classifyProviderFailure,
   FINAL_STATUSES,
-  isQuotaError,
+  isMinuteRateReason,
   nextCheckDelayMs,
   normalizeName,
+  numericHeader,
   providerErrorText,
   resolveUniqueFixture,
   type AfFixture,
   type AfUpdate,
   type MappingCandidate,
+  type ProviderFailureKind,
 } from "@/lib/live/af-core";
+
 
 /**
  * API-Football is the PRIMARY source for live SCORE + STATUS.
@@ -31,6 +35,10 @@ const HOST = "https://v3.football.api-sports.io";
 export const AF_PROVIDER = "api-football";
 const PAUSE_KEY = "af_paused_until";
 const PAUSE_REASON_KEY = "af_pause_reason";
+const STRIKES_KEY = "af_pause_strikes";
+/** A per-minute rate limit may never hold the provider longer than this. */
+const MINUTE_PAUSE_CEILING_MS = 15 * 60_000;
+
 
 /** Sofascore tournament_id -> API-Football league id (verified via /leagues). */
 const LEAGUE_BY_TOURNAMENT: Record<string, number> = {
@@ -76,6 +84,14 @@ export type AfLiveResult = {
   bulk_budget_blocked: boolean;
   provider_error: string | null;
   paused_until: string | null;
+  /** Why the provider refused, when it did. */
+  pause_kind: ProviderFailureKind;
+  pause_evidence: string | null;
+  /** A stale minute-rate pause was shortened at the start of this run. */
+  pause_reclassified: boolean;
+  /** Sanitized rate/quota headers from the last provider response. */
+  provider_headers: Record<string, string | null> | null;
+
   live_fixtures: number;
   mapped_live: number;
   updated: number;
@@ -101,6 +117,11 @@ function emptyResult(keyPresent: boolean): AfLiveResult {
     bulk_budget_blocked: false,
     provider_error: null,
     paused_until: null,
+    pause_kind: "none",
+    pause_evidence: null,
+    pause_reclassified: false,
+    provider_headers: null,
+
     live_fixtures: 0,
     mapped_live: 0,
     updated: 0,
@@ -126,35 +147,74 @@ async function take(category: "live" | "bulk", count = 1): Promise<boolean> {
   return data === true;
 }
 
-async function readPause(): Promise<string | null> {
-  const { data } = await supabaseAdmin
+async function readConfig(keys: string[]): Promise<Record<string, string>> {
+  const { data } = await supabaseAdmin.from("cron_config").select("key, value").in("key", keys);
+  const out: Record<string, string> = {};
+  for (const r of data ?? []) out[r.key] = r.value;
+  return out;
+}
+
+async function writeConfig(key: string, value: string): Promise<void> {
+  await supabaseAdmin
     .from("cron_config")
-    .select("value")
-    .eq("key", PAUSE_KEY)
-    .maybeSingle();
-  const until = data?.value ? Date.parse(data.value) : NaN;
-  if (!Number.isFinite(until) || until <= Date.now()) return null;
-  return new Date(until).toISOString();
+    .upsert({ key, value: value.slice(0, 300) }, { onConflict: "key" });
+}
+
+export type AfPauseState = {
+  until: string | null;
+  reason: string;
+  strikes: number;
+  /** Set when a stale minute-rate pause was shortened on this read. */
+  reclassified: boolean;
+};
+
+/**
+ * Read the persisted pause. A pause whose recorded reason is unmistakably a
+ * per-minute rate limit is never allowed to hold the provider for longer than
+ * the bounded minute ceiling — that is the recovery bug this fixes. Daily /
+ * plan / account pauses are preserved exactly as stored.
+ */
+async function readPauseState(): Promise<AfPauseState> {
+  const cfg = await readConfig([PAUSE_KEY, PAUSE_REASON_KEY, STRIKES_KEY]);
+  const reason = cfg[PAUSE_REASON_KEY] ?? "";
+  const strikes = Number(cfg[STRIKES_KEY]) || 0;
+  const rawUntil = cfg[PAUSE_KEY] ? Date.parse(cfg[PAUSE_KEY]!) : NaN;
+  if (!Number.isFinite(rawUntil) || rawUntil <= Date.now()) {
+    return { until: null, reason, strikes, reclassified: false };
+  }
+  if (isMinuteRateReason(reason) && rawUntil - Date.now() > MINUTE_PAUSE_CEILING_MS) {
+    await writeConfig(PAUSE_KEY, new Date(Date.now() - 1000).toISOString());
+    await writeConfig(
+      PAUSE_REASON_KEY,
+      `reclassified minute rate-limit pause (was until ${new Date(rawUntil).toISOString()}): ${reason}`,
+    );
+    return { until: null, reason, strikes, reclassified: true };
+  }
+  return { until: new Date(rawUntil).toISOString(), reason, strikes, reclassified: false };
 }
 
 /** Bounded pause; it always expires so recovery is automatic and sparse. */
-async function setPause(untilIso: string, reason: string): Promise<void> {
-  await supabaseAdmin
-    .from("cron_config")
-    .upsert({ key: PAUSE_KEY, value: untilIso }, { onConflict: "key" });
-  await supabaseAdmin
-    .from("cron_config")
-    .upsert({ key: PAUSE_REASON_KEY, value: reason.slice(0, 300) }, { onConflict: "key" });
+async function setPause(untilIso: string, reason: string, strikes: number): Promise<void> {
+  await writeConfig(PAUSE_KEY, untilIso);
+  await writeConfig(PAUSE_REASON_KEY, reason);
+  await writeConfig(STRIKES_KEY, String(strikes));
+}
+
+async function clearPause(): Promise<void> {
+  await writeConfig(STRIKES_KEY, "0");
+  const cfg = await readConfig([PAUSE_KEY]);
+  if (cfg[PAUSE_KEY]) await writeConfig(PAUSE_KEY, new Date(Date.now() - 1000).toISOString());
 }
 
 /**
  * Reconcile the provider's own usage counter with ours: it is recorded as a
  * conservative floor for today, never added to the local count.
+ * Absent headers are absent — never coerced into 0.
  */
 async function noteUsageHeaders(res: Response): Promise<void> {
-  const limit = Number(res.headers.get("x-ratelimit-requests-limit"));
-  const remaining = Number(res.headers.get("x-ratelimit-requests-remaining"));
-  if (!Number.isFinite(limit) || !Number.isFinite(remaining)) return;
+  const limit = numericHeader(res.headers.get("x-ratelimit-requests-limit"));
+  const remaining = numericHeader(res.headers.get("x-ratelimit-requests-remaining"));
+  if (limit == null || remaining == null || limit <= 0) return;
   const used = limit - remaining;
   if (used < 0) return;
   await supabaseAdmin.rpc("api_budget_note_reported", {
@@ -164,7 +224,18 @@ async function noteUsageHeaders(res: Response): Promise<void> {
   });
 }
 
-function makeCaller(apiKey: string, result: AfLiveResult) {
+/** Sanitized diagnostic snapshot. Only rate/quota headers — never auth headers. */
+function headerSnapshot(res: Response): Record<string, string | null> {
+  return {
+    retry_after: res.headers.get("retry-after"),
+    day_limit: res.headers.get("x-ratelimit-requests-limit"),
+    day_remaining: res.headers.get("x-ratelimit-requests-remaining"),
+    minute_limit: res.headers.get("x-ratelimit-limit"),
+    minute_remaining: res.headers.get("x-ratelimit-remaining"),
+  };
+}
+
+function makeCaller(apiKey: string, result: AfLiveResult, strikes: number) {
   return async function call(
     path: string,
     category: "live" | "bulk",
@@ -191,6 +262,7 @@ function makeCaller(apiKey: string, result: AfLiveResult) {
     }
     const text = await res.text();
     await noteUsageHeaders(res);
+    result.provider_headers = headerSnapshot(res);
 
     let json: AnyRec | null = null;
     try {
@@ -200,24 +272,43 @@ function makeCaller(apiKey: string, result: AfLiveResult) {
     }
     const providerError = providerErrorText(json);
     const httpBad = res.status < 200 || res.status >= 300;
+    const schemaBad = json !== null && !httpBad && !providerError && !("response" in json);
 
-    if (httpBad || providerError || json === null) {
-      const detail = providerError ?? (httpBad ? `http ${res.status}` : "unparsable body");
+    if (httpBad || providerError || json === null || schemaBad) {
+      const detail =
+        providerError ??
+        (httpBad ? `http ${res.status}` : json === null ? "unparsable body" : "missing response field");
       result.provider_error = `${detail} on ${endpoint}`;
-      if (isQuotaError(providerError, res.status)) {
-        // Honour the provider reset when it gives one, otherwise next UTC day.
-        const resetSeconds = Number(res.headers.get("x-ratelimit-requests-reset"));
-        const until = Number.isFinite(resetSeconds) && resetSeconds > 0
-          ? new Date(Date.now() + Math.min(resetSeconds, 86_400) * 1000)
-          : new Date(new Date().setUTCHours(24, 5, 0, 0));
-        result.paused_until = until.toISOString();
-        await setPause(result.paused_until, result.provider_error);
+      const failure = classifyProviderFailure({
+        text: providerError,
+        httpStatus: res.status,
+        headers: {
+          retryAfter: res.headers.get("retry-after"),
+          dayLimit: res.headers.get("x-ratelimit-requests-limit"),
+          dayRemaining: res.headers.get("x-ratelimit-requests-remaining"),
+          minuteLimit: res.headers.get("x-ratelimit-limit"),
+          minuteRemaining: res.headers.get("x-ratelimit-remaining"),
+        },
+        nowMs: Date.now(),
+        consecutiveFailures: strikes,
+      });
+      if (failure.kind !== "none") {
+        result.pause_kind = failure.kind;
+        result.pause_evidence = failure.evidence;
+        result.paused_until = new Date(Date.now() + failure.cooldownMs).toISOString();
+        await setPause(
+          result.paused_until,
+          `${failure.kind}: ${result.provider_error}`,
+          strikes + 1,
+        );
       }
       return null;
     }
+    await clearPause();
     return json;
   };
 }
+
 
 function toCandidate(fx: AfFixture): MappingCandidate | null {
   const id = fx.fixture?.id;
@@ -491,13 +582,16 @@ export async function runAfLive(options?: {
     return result;
   }
 
-  result.paused_until = await readPause();
+  const pauseState = await readPauseState();
+  result.pause_reclassified = pauseState.reclassified;
+  result.paused_until = pauseState.until;
   if (result.paused_until) {
     result.provider_error = `paused until ${result.paused_until}`;
     return result;
   }
 
-  const call = makeCaller(apiKey, result);
+  const call = makeCaller(apiKey, result, pauseState.strikes);
+
   const nowMs = Date.now();
 
   // 1. ONE aggregated live request for every user and every match. This runs

@@ -300,3 +300,149 @@ export function isQuotaError(text: string | null, httpStatus: number | null): bo
   if (!text) return false;
   return /quota|rate ?limit|too many requests|exceeded/i.test(text);
 }
+
+// ------------------------------------------------- failure classification
+
+export type ProviderFailureKind = "none" | "minute" | "daily" | "unknown";
+
+export type ProviderFailure = {
+  kind: ProviderFailureKind;
+  /** How long to stop calling the provider, in milliseconds. 0 when kind is "none". */
+  cooldownMs: number;
+  /** Sanitized, key-free explanation of what decided the classification. */
+  evidence: string;
+};
+
+const MINUTE_BASE_MS = 65_000;
+const MINUTE_MAX_MS = 15 * 60_000;
+const UNKNOWN_BASE_MS = 5 * 60_000;
+
+/**
+ * Retry-After per RFC 9110: delta-seconds or an HTTP-date. Anything else, a
+ * non-positive delta, or an absurd value is rejected rather than trusted.
+ */
+export function parseRetryAfter(raw: string | null | undefined, nowMs: number): number | null {
+  if (raw == null) return null;
+  const v = raw.trim();
+  if (v.length === 0) return null;
+  if (/^\d+$/.test(v)) {
+    const secs = Number(v);
+    if (secs <= 0 || secs > 86_400) return null;
+    return secs * 1000;
+  }
+  const ts = Date.parse(v);
+  if (!Number.isFinite(ts)) return null;
+  const delta = ts - nowMs;
+  if (delta <= 0 || delta > 86_400_000) return null;
+  return delta;
+}
+
+/**
+ * A header is only evidence when it is actually present AND numeric. A missing
+ * header must never be read as 0 — that is how a per-minute hiccup used to be
+ * mistaken for a whole day of exhausted quota.
+ */
+export function numericHeader(raw: string | null | undefined): number | null {
+  if (raw == null) return null;
+  const v = raw.trim();
+  if (v.length === 0 || !/^-?\d+(\.\d+)?$/.test(v)) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function boundedBackoff(base: number, max: number, consecutiveFailures: number): number {
+  const n = Math.max(0, Math.min(consecutiveFailures, 10));
+  return Math.min(max, base * Math.pow(2, n));
+}
+
+export type ProviderHeaders = {
+  retryAfter?: string | null;
+  /** x-ratelimit-requests-limit / -remaining (daily plan counters) */
+  dayLimit?: string | null;
+  dayRemaining?: string | null;
+  /** x-ratelimit-limit / -remaining (per-minute counters) */
+  minuteLimit?: string | null;
+  minuteRemaining?: string | null;
+};
+
+/**
+ * Decide WHY the provider refused and for how long to back off.
+ *
+ * - a per-minute rate limit is a short, self-healing condition
+ * - a daily/plan exhaustion needs explicit evidence: the provider saying so,
+ *   or a genuine remaining=0 against a positive daily limit
+ * - anything else 429-ish gets a conservative bounded cooldown, never a
+ *   day-long shutdown
+ */
+export function classifyProviderFailure(opts: {
+  text: string | null;
+  httpStatus: number | null;
+  headers?: ProviderHeaders;
+  nowMs: number;
+  consecutiveFailures?: number;
+}): ProviderFailure {
+  const { text, httpStatus, nowMs } = opts;
+  const headers = opts.headers ?? {};
+  const fails = opts.consecutiveFailures ?? 0;
+  if (!isQuotaError(text, httpStatus)) return { kind: "none", cooldownMs: 0, evidence: "" };
+
+  const retryAfterMs = parseRetryAfter(headers.retryAfter, nowMs);
+  const dayLimit = numericHeader(headers.dayLimit);
+  const dayRemaining = numericHeader(headers.dayRemaining);
+  const minuteLimit = numericHeader(headers.minuteLimit);
+  const minuteRemaining = numericHeader(headers.minuteRemaining);
+
+  const t = text ?? "";
+  const saysMinute = /per minute|rate ?limit|too many requests/i.test(t);
+  const saysDaily = /per day|daily|day quota|requests on your current plan|monthly/i.test(t);
+
+  const minuteExhausted =
+    minuteLimit != null && minuteLimit > 0 && minuteRemaining != null && minuteRemaining <= 0;
+  const dayExhausted =
+    dayLimit != null && dayLimit > 0 && dayRemaining != null && dayRemaining <= 0;
+
+  if (saysDaily || (dayExhausted && !saysMinute)) {
+    const untilNextDay = new Date(new Date(nowMs).setUTCHours(24, 5, 0, 0)).getTime() - nowMs;
+    return {
+      kind: "daily",
+      cooldownMs: retryAfterMs ?? Math.max(untilNextDay, 60_000),
+      evidence: saysDaily
+        ? "provider text names a daily/plan quota"
+        : `daily counters exhausted (remaining ${dayRemaining}/${dayLimit})`,
+    };
+  }
+
+  if (saysMinute || minuteExhausted) {
+    return {
+      kind: "minute",
+      cooldownMs: Math.min(
+        MINUTE_MAX_MS,
+        retryAfterMs ?? boundedBackoff(MINUTE_BASE_MS, MINUTE_MAX_MS, fails),
+      ),
+      evidence: saysMinute
+        ? "provider text names a per-minute rate limit"
+        : `minute counters exhausted (remaining ${minuteRemaining}/${minuteLimit})`,
+    };
+  }
+
+  return {
+    kind: "unknown",
+    cooldownMs: Math.min(
+      MINUTE_MAX_MS,
+      retryAfterMs ?? boundedBackoff(UNKNOWN_BASE_MS, MINUTE_MAX_MS, fails),
+    ),
+    evidence: "unclassified 429 — conservative bounded cooldown",
+  };
+}
+
+/**
+ * A persisted pause is reclassifiable only when its stored reason is
+ * unmistakably a per-minute rate limit. Daily quota, plan and account
+ * problems stay untouched.
+ */
+export function isMinuteRateReason(reason: string | null | undefined): boolean {
+  if (!reason) return false;
+  if (/per day|daily|monthly|suspend|account|unauthor|forbidden|plan/i.test(reason)) return false;
+  return /per minute|rate ?limit|too many requests/i.test(reason);
+}
+
