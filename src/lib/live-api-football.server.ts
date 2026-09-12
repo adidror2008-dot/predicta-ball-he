@@ -82,6 +82,8 @@ export type AfLiveResult = {
   live_budget_blocked: boolean;
   /** Optional background work (mapping discovery) had no budget. Never a core failure. */
   bulk_budget_blocked: boolean;
+  /** Optional background work was refused this run; the live path stays usable. */
+  bulk_blocked_reason: string | null;
   provider_error: string | null;
   paused_until: string | null;
   /** Why the provider refused, when it did. */
@@ -115,6 +117,7 @@ function emptyResult(keyPresent: boolean): AfLiveResult {
     live_ok: false,
     live_budget_blocked: false,
     bulk_budget_blocked: false,
+    bulk_blocked_reason: null,
     provider_error: null,
     paused_until: null,
     pause_kind: "none",
@@ -227,25 +230,49 @@ async function noteUsageHeaders(res: Response): Promise<void> {
 /** Sanitized diagnostic snapshot. Only rate/quota headers — never auth headers. */
 function headerSnapshot(res: Response): Record<string, string | null> {
   return {
+    http_status: String(res.status),
     retry_after: res.headers.get("retry-after"),
     day_limit: res.headers.get("x-ratelimit-requests-limit"),
     day_remaining: res.headers.get("x-ratelimit-requests-remaining"),
     minute_limit: res.headers.get("x-ratelimit-limit"),
     minute_remaining: res.headers.get("x-ratelimit-remaining"),
+    // Transport provenance only — never auth headers. Tells apart a real
+    // provider answer from an edge/gateway answer produced before it.
+    server: res.headers.get("server"),
+    content_type: res.headers.get("content-type"),
+    cf_ray: res.headers.get("cf-ray"),
+    request_id: res.headers.get("x-request-id") ?? res.headers.get("x-amzn-requestid"),
+    via: res.headers.get("via"),
+    date: res.headers.get("date"),
   };
 }
 
+
+/**
+ * The provider refuses two requests issued back-to-back inside the same run
+ * even at our very low volume, so calls in a run are spaced apart.
+ */
+const MIN_CALL_SPACING_MS = 2_000;
+
 function makeCaller(apiKey: string, result: AfLiveResult, strikes: number) {
+  let lastCallAt = 0;
   return async function call(
     path: string,
     category: "live" | "bulk",
   ): Promise<AnyRec | null> {
     if (result.paused_until) return null;
+    // A per-minute refusal on optional bulk work must never stop the live path.
+    if (category === "bulk" && result.bulk_blocked_reason) return null;
     if (!(await take(category))) {
       if (category === "live") result.live_budget_blocked = true;
       else result.bulk_budget_blocked = true;
       return null;
     }
+    const sinceLast = Date.now() - lastCallAt;
+    if (lastCallAt > 0 && sinceLast < MIN_CALL_SPACING_MS) {
+      await new Promise((r) => setTimeout(r, MIN_CALL_SPACING_MS - sinceLast));
+    }
+    lastCallAt = Date.now();
     result.calls_used += 1;
     const endpoint = path.split("?")[0];
     let res: Response;
@@ -292,6 +319,14 @@ function makeCaller(apiKey: string, result: AfLiveResult, strikes: number) {
         nowMs: Date.now(),
         consecutiveFailures: strikes,
       });
+      if (failure.kind === "minute" && category === "bulk") {
+        // Optional background work only: skip the rest of it this run and keep
+        // the live path usable on the next tick.
+        result.bulk_blocked_reason = `${failure.kind}: ${result.provider_error}`;
+        result.pause_kind = failure.kind;
+        result.pause_evidence = failure.evidence;
+        return null;
+      }
       if (failure.kind !== "none") {
         result.pause_kind = failure.kind;
         result.pause_evidence = failure.evidence;
@@ -304,10 +339,11 @@ function makeCaller(apiKey: string, result: AfLiveResult, strikes: number) {
       }
       return null;
     }
-    await clearPause();
+    if (category === "live") await clearPause();
     return json;
   };
 }
+
 
 
 function toCandidate(fx: AfFixture): MappingCandidate | null {
