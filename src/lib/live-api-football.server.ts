@@ -227,13 +227,23 @@ async function noteUsageHeaders(res: Response): Promise<void> {
 /** Sanitized diagnostic snapshot. Only rate/quota headers — never auth headers. */
 function headerSnapshot(res: Response): Record<string, string | null> {
   return {
+    http_status: String(res.status),
     retry_after: res.headers.get("retry-after"),
     day_limit: res.headers.get("x-ratelimit-requests-limit"),
     day_remaining: res.headers.get("x-ratelimit-requests-remaining"),
     minute_limit: res.headers.get("x-ratelimit-limit"),
     minute_remaining: res.headers.get("x-ratelimit-remaining"),
+    // Transport provenance only — never auth headers. Tells apart a real
+    // provider answer from an edge/gateway answer produced before it.
+    server: res.headers.get("server"),
+    content_type: res.headers.get("content-type"),
+    cf_ray: res.headers.get("cf-ray"),
+    request_id: res.headers.get("x-request-id") ?? res.headers.get("x-amzn-requestid"),
+    via: res.headers.get("via"),
+    date: res.headers.get("date"),
   };
 }
+
 
 function makeCaller(apiKey: string, result: AfLiveResult, strikes: number) {
   return async function call(
