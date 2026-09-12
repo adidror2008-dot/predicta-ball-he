@@ -82,6 +82,8 @@ export type AfLiveResult = {
   live_budget_blocked: boolean;
   /** Optional background work (mapping discovery) had no budget. Never a core failure. */
   bulk_budget_blocked: boolean;
+  /** Optional background work was refused this run; the live path stays usable. */
+  bulk_blocked_reason: string | null;
   provider_error: string | null;
   paused_until: string | null;
   /** Why the provider refused, when it did. */
@@ -115,6 +117,7 @@ function emptyResult(keyPresent: boolean): AfLiveResult {
     live_ok: false,
     live_budget_blocked: false,
     bulk_budget_blocked: false,
+    bulk_blocked_reason: null,
     provider_error: null,
     paused_until: null,
     pause_kind: "none",
